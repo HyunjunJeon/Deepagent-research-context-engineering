@@ -1,0 +1,1735 @@
+Found 1 result(s) for 'Context Engineering 사례 연구: 연구 에이전트형 AI 시스템, agentic AI, multi-agent system에서의 적용':
+
+## How to Build Multi Agent AI Systems With Context Engineering
+**URL:** https://www.vellum.ai/blog/multi-agent-systems-building-with-context-engineering
+
+How to Build Multi Agent AI Systems With Context Engineering
+
+**Vellum is coming to the AI Engineering World's Fair in SF. Come visit our booth and get a live demo!**
+
+* Products
+
+  [Orchestration](/products/orchestration)[SDK](/products/workflows-sdk)[Prompting](/products/prompt-engineering)[Evaluations](/products/evaluation)[Retrieval](/products/retrieval)[Deployment](/products/deployments)[Observability](/products/monitoring)
+* Resources
+
+  Customer Resources
+
+  [News](/news)[Blog](/blog)[Webinars](/webinars)[Templates](/templates)[Leaderboards](/llm-leaderboard)[LLM Parameters Guide](/llm-parameters-guide)
+
+  Customer Spotlights
+
+  [Case Studies](/blog?category=Customer+Stories)[Use Cases](/use-case-directory)
+
+  ![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68a65834ff1b9643bcb00b26_Coursemojo%20Case%20Study%20Thumbnail.avif)
+
+  How Coursemojo Sped Up AI Delivery by 6+ Months
+* [Docs](https://docs.vellum.ai/help-center/welcome/welcome)
+* [Enterprise](/enterprise)
+* [Pricing](/pricing)
+
+[Get Started](#)
+
+[![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/66f50a2cad08bc3b390eb5e9_Icon.svg)
+
+All](/blog)
+
+[![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/66f50918efdfb829fb74471a_Icons.svg)
+
+Customer Stories](https://www.vellum.ai/blog?category=Customer+Stories)
+
+[![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/66f508ee4ed9a5aab6105f84_Icons.svg)
+
+Product Updates](https://www.vellum.ai/blog?category=Product+Updates)
+
+[![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/66f508d51c59cbfc28692cda_Icon.svg)
+
+Model Comparisons](https://www.vellum.ai/blog?category=Model+Comparisons)
+
+[![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/66f50886f6e3e03c9aef2f2a_Icons.svg)
+
+LLM basics](https://www.vellum.ai/blog?category=LLM+basics)
+
+[![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/670416e02ab0997ea510d76f_Icons.svg)
+
+Guides](https://www.vellum.ai/blog?category=Guides)
+
+[All Post](/blog)[/](#)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/670416e02ab0997ea510d76f_Icons.svg)[Guides](/blog/multi-agent-systems-building-with-context-engineering)
+
+[![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/66f514d74ccaf48d439c6c3b_search.svg)
+
+Search...](#)
+
+Best practices for building AI multi agent system
+=================================================
+
+A practical guide to building production grade, multi agent AI systems using context engineering best practices.
+
+•
+
+7 min
+
+Written by
+
+[Nicolas Zeeb](https://www.linkedin.com/in/nicolaszeeb/)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/689659d37540b34fdce81cbf_Webflow%20Heeadshot.avif)
+
+Reviewed by
+
+[Anita Kirkovska](https://www.linkedin.com/in/anitakirkovska)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68d4713e802d00e15cf5e695_anita-photo.avif)
+
+No items found.
+
+CONTENTS
+
+[Inline evaluation / Guardrails: Ensure good system performance at run-time](#)
+
+[This is some text inside of a div block.](#)
+
+Agentic automation has changed the game for everyone, but when tasks become too complex, interdependent, and/or require deep SME context the limitations become abundantly clear.
+
+Teams are experiencing these blocks when pushing the boundaries of agent building by expanding single agent workflows to a multi agent systems.
+
+The workaround?
+
+Engineering context strategically into a multi agent system to manage complexity at scale.
+
+This blog explores multi-agent systems, context engineering frameworks, and practical best practices for teams ready to build working multi-agent solutions that actually work.
+
+Quick overview
+--------------
+
+Multi-agent systems are a powerful step beyond single-agent workflows, but they bring complexity. By layering in context engineering best practices, teams can scale coordination, reduce failures, and unlock production-grade performance with multi agent systems.
+
+This guide gives you the practical and actionable knowledge to confidently build multi-agent workflows that work.
+
+Why this matters
+----------------
+
+Most AI builders hit a ceiling with single agents once tasks become too complex. Multi-agent systems are emerging as the solution to break this ceiling. When engineered correctly with the right context they turn complex fragmentation into collaboration.
+
+For organizations serious about deploying agents in production, mastering these strategies is the difference between experiments that break and AI that makes it to production.
+
+What is a multi agent system?
+-----------------------------
+
+**Multi agent systems** coordinate multiple specialized agents to solve complex problems collaboratively.
+
+Each agent has a specific role and context window, working in parallel toward a shared output. Like human teams, they rely on clear role definition, scoped responsibilities, and synchronized outputs to succeed.
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/6896641eaabfb1036288ac4d_Single%20Agent%20vs%20Multi%20Agent%20AI.avif)
+
+Anthropic showcased a successful multi-agent research system that was organized with an Opus 4 lead agent managing coordinated Sonnet 4 specialized subagents that worked on tasks in parallel.
+
+This system outperformed a Opus 4 single-agent by 90.2% on internal research evaluations, with token usage explaining 80% of performance variance in their BrowseComp analysis [[1]](https://www.anthropic.com/engineering/built-multi-agent-research-system).
+
+Though Anthropic achieved phenomenal results using multi-agent systems, it isn’t fully clear whether this approach will work better for teams using single agents for their AI needs.
+
+### Are multi agent systems right for you?
+
+Though powerful, not every task calls for multiple AI agents. In fact, multi-agent systems can introduce complexity, coordination risk, and significantly higher token usage.
+
+Think about a task like generating automating product descriptions based on a few attributes (e.g. name, category, and key features).
+
+This is a straightforward task, that fits within a single context window, where the agent can handle prompt interpretation, structured output formatting, and language generation without needing help from specialized sub-agents.
+
+**Use a single agent when:**
+
+* Your task is linear or involves unified reasoning.
+* Real-time responses and low latency are important.
+* The problem fits within a single context window.
+
+Now, think about a workflow for deep research where the goal is to compare economic policies across countries using live data, expert analysis, and statistical indicators.
+
+This kind of task is too complex for one agent to handle well on its own, so using Anthropic’s approach as an example, there would need to be a lead agent responsible for overseeing the process and coordinating multiple specialized sub-agents.
+
+It looks like this:
+
+* One sub-agent would use Browse tools to pull recent economic news and government reports.
+* Another would query structured data sources (e.g. GDP, inflation, interest rates) and calculate key metrics using Calculator tools.
+* A third sub-agent could summarize expert commentary or academic literature.
+* The lead agent (Opus 4 in Anthropic’s case) would then synthesize all outputs, ensuring consistency, resolving contradictions, and generating a well-structured comparative analysis.
+
+With each agent operates with scoped instructions and context, the system  runs **i**n parallel, sustains accuracy, and avoids overloading any single agent with too much responsibility or information.
+
+**Use a multi agent system when:**
+
+* Tasks can be naturally split into subproblems.
+* Agents can specialize (e.g. research, planning, analysis).
+* Work can be parallelized or decomposed across roles.
+* You require external memory or broad tool orchestration.
+
+If those conditions aren’t met, a well-structured single-agent system may be more reliable and easier to maintain [[2]](https://www.kubiya.ai/blog/single-agent-vs-multi-agent-in-ai).
+
+A good rule of thumb is to start with a single-agent and scale to multi-agent architectures only after proving value and identifying a clear need for specialization or parallelism. Learn more about this approach by exploring our guide on [building agentic workflows](https://www.vellum.ai/blog/agentic-workflows-emerging-architectures-and-design-patterns) that scale on Vellum.
+
+Common orchestrations
+---------------------
+
+Multi-agent systems can be structured in different ways depending on how agents interact, delegate, and share state, ultimately shaping how the system coordinates work, manages failures, and distributes reasoning.
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/6896647c2cf8d5b597199770_Common%20Multi%20Agent%20Orchestration%20Patterns.avif)
+
+Here are the three most common patterns:
+
+* **Supervisor Pattern**‍  
+  + A central agent acts as a manager that delegates tasks to specialized sub-agents and integrating their outputs. This mirrors a traditional team structure and is useful for workflows that need tight oversight.
+
+* **Hierarchical Pattern**  
+  + Agents are arranged in a chain, where the output of one becomes the input for the next. This works well for sequential workflows like planning → research → summarization, where each stage builds on the previous.
+* **Network Pattern (Peer-to-Peer)**  
+  + Agents operate independently but share access to a shared state or memory layer. Coordination happens through updates to that state, making this ideal for collaborative or parallelized problem-solving.
+
+Choosing the right orchestration pattern depends on your task structure, agent specialization, and need for control versus autonomy.
+
+Managing complexity with context engineering
+--------------------------------------------
+
+Cognition found that the main issue with multi agent systems is that they are highly failure prone when agents work from conflicting assumptions or incomplete information, specifically noting that subagents often take actions based on conflicting assumptions that weren't established upfront [[3]](https://cognition.ai/blog/dont-build-multi-agents).
+
+This means failure will generally always boil down to missing context within the system. How to maintain this necessary context?
+
+[Context engineering](https://www.vellum.ai/blog/context-is-king-why-context-engineering-is-the-new-frontier-for-ai-agents). The defining principle is as follows:
+
+Build agents that factor in the collective knowledge and decisions of the entire system before acting.
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/689664b7cccb5fbac7cc68d2_Context%20Engineering%20Diagram.avif)
+
+It is quickly evolving as a practice of designing, managing, and maintaining the input context used by agents in multi-agent systems. It keeps operations in scope so agents can make informed decisions that guarantee successful outputs.
+
+### Understanding context types
+
+Ensuring success first comes by understanding that not all context is the same, and builders must be precise in the types of context they leverage when building these systems.
+
+Context types typically include:
+
+* Instructions: prompts, rules, few-shot examples, tool descriptions
+* Knowledge: domain facts, retrieved data, semantic memory
+* Tool feedback: prior decisions, API outputs, runtime signals
+
+Managing this across agents requires structured context engineering strategies [[4]](https://blog.langchain.com/context-engineering-for-agents/):
+
+1. Writing Context: Save information outside the context window so agents can reference it later (e.g. memory objects, files, or runtime state).
+2. Selecting Context: Retrieve only what’s needed at the moment by using RAG, similarity search, or filters to surface relevant data, instructions, or tools.
+3. Compressing Context: Summarize or trim past messages or tool outputs to prevent token bloat.
+4. Isolating Context: Give each agent a scoped window to avoid conflict or distraction.
+
+The idea is to leverage and ensure strategic injections of different context types, message passing, and coordination strategies when building multi agent systems, builders can ensure agents receive the right information dynamically as the multi-agent system runs.
+
+Here’s how its done.
+
+Context engineering best practices
+----------------------------------
+
+Effective multi agent systems require an architecture that encodes contextual awareness at the agent level by ensuring each agent has a precise understanding of its role, scope, dependencies, and decision boundaries.
+
+This begins by systematically answering the following design questions for every agent:
+
+1. **What decisions have other agents already made that will affect this agent's work?**
+   * In a multi agent customer support system, if the “triage agent” already classified the issue as a billing problem, the next agent (e.g. “solution agent”) should avoid reclassifying it or asking redundant intake questions.
+   * **Context approach:** Store decisions in shared state or memory and inject them into downstream prompts as structured flags (e.g. issue\_type: billing).
+2. **How do we prevent agents from making conflicting assumptions about the same task?**
+   * In Anthropic’s research system, multiple sub-agents were assigned to collect different types of information about a single topic. If there were no shared task framing, one agent might focus on sourcing recent quantitative data, while another could interpret the same topic through qualitative or outdated sources ultimately leading to mismatched assumptions or conflicting conclusions.
+   * **Context approach:** Inject a unified task description and shared assumptions into each agent’s context block (e.g. “focus on policy impacts from 2020 onward,” or “prioritize official government sources”), and record framing decisions in shared memory so all agents stay aligned.
+3. **What information from previous agent interactions is essential versus noise?**
+   * In a multi-agent writing system (e.g. outline → draft → refine), only key decisions like tone, voice, and audience should be passed forward — not raw brainstorm content or irrelevant tool outputs.
+   * **Context approach:** Use summarization and context compression (e.g. summary\_of\_prior\_steps) to reduce noise while preserving intent.
+4. **How do we maintain consistency across parallel agents without full context sharing?**
+   * When two agents independently summarize sections of the same research report, they may format or cite things differently.
+   * **Context approach:** Set formatting rules and shared stylistic instructions (e.g. APA citations, tone guidelines) as part of each agent’s prompt template.
+5. When agents work simultaneously, how do we avoid duplicated effort or contradictory outputs?
+   * In a workflow where one agent gathers data and another explains it, both might attempt to retrieve similar stats if unaware of each other’s roles.
+   * **Context approach:** Assign scoped responsibilities and dynamically reference shared memory to check what’s already been done (e.g. if "GDP data" exists in memory, skip retrieval).
+
+### TLDR;
+
+| Orchestration Pattern | Coordination Mechanism | Instructions | Knowledge | Tool Feedback | Replayability | Dynamic Tool Routing |
+| --- | --- | --- | --- | --- | --- | --- |
+| Supervisor | Message Passing (Direct) | High | Medium (optional) | High | Supported | Strong |
+| Hierarchical | Message Passing + Shared State (Light) | High | Medium (stage-specific) | High | Limited | Limited |
+| Network (Peer-to-Peer) | Shared State | Medium (static) | High | High | Strong | Strong |
+
+‍
+
+Common mistakes to avoid
+------------------------
+
+Here are the most common failure modes when building multi-agent systems, and how to design around them.
+
+| Failure Mode | Cause | Solution Strategy |
+| --- | --- | --- |
+| Token Sprawl | Redundant context shared across agents | Trim prompts, use Corpus-in-Context, compress tool output |
+| Coordination Drift | Misaligned roles, prompt changes | Modular prompt versioning, audit history, observability |
+| Context Overflow | Too much information in context window | External memory, scoped scratchpads, summarization |
+| Hallucination | Incomplete or conflicting grounding | Better context filtering, evaluation, memory QA |
+
+Token sprawl often becomes the blocker in multi agent system often consuming up to 15x more tokens than standard chat interactions, making them viable only for high-value workflows where the performance gains justify the cost [[1]](https://www.anthropic.com/engineering/built-multi-agent-research-system).
+
+Coordination drift poses major risks, especially when agents lack shared grounding, produce contradictory outputs, or depend on outdated intermediate steps [[5]](https://thegrigorian.medium.com/why-do-multi-agent-llm-systems-fail-14dc34e0f3cb). These issues become even more pronounced as systems scale due to the exponential growth in agent interactions and communication overhead [[6]](https://arxiv.org/abs/2503.13657).
+
+Context overflow requires careful information architecture, so by designing your system to pass only essential context between agents rather than full conversation histories, context overflow and subsequently hallucinations can be avoided.
+
+Scaling multi-agent systems without the proper tooling is incredibly hard; managing distributed prompts, coordinating across agents, and keeping everything observable isn’t something most teams can pull off.
+
+It takes the kind of infrastructure that is purpose-built to turn best practices into real, working systems.
+
+Enter Vellum.
+
+Building multi agent systems in Vellum
+--------------------------------------
+
+Vellum is designed to provide the infrastructure necessary to orchestrate complex agent systems, with a tooling and feature set that ensures mission critical accuracy at deployment.
+
+We provide a [robust toolkit](https://www.vellum.ai/blog/how-drata-built-an-enterprise-grade-ai-solution-with-vellum) for experimentation, evaluation, and production management. This is where [Vellum](https://www.vellum.ai/landing-pages/request-demo) becomes your control panel for building sophisticated agents.
+
+Here is how Vellum supports the coordination strategies and context patterns covered above:
+
+Solving Token Sprawl:
+
+* [**Corpus-in-Context**](https://www.vellum.ai/blog/how-to-optimize-long-context-prompts-with-corpus-in-context-prompting)and [**RAG Pipelines**](https://docs.vellum.ai/product/workflows/common-architectures/rag-system)pull in only the most relevant external knowledge with long-context optimization, eliminating redundant information sharing
+* [**Prompt Engineering Tools**](https://www.vellum.ai/products/prompt-engineering) enables dynamic, role-specific prompts using templating, ensuring each agent receives only necessary context
+
+Preventing Coordination Drift:
+
+* [**Prompt Sandbox**](https://docs.vellum.ai/product/prompts/collaboration) and [**Versioning**](https://docs.vellum.ai/product/deployments/deployment-lifecycle-management#deployment-versioning) provides safe testing environments to monitor prompt evolution and tag stable releases
+* [**Evaluation and Observability**](https://docs.vellum.ai/product/deployments/observability) enables regression testing and live monitoring of agent performance to catch drift early
+* [**Deployment and Rollbacks**](https://docs.vellum.ai/product/deployments/deployment-lifecycle-management) allows teams to safely revert prompt configurations without downtime when coordination issues arise
+
+Managing Context Overflow:
+
+* [**Workflow Orchestration**](https://docs.vellum.ai/product/workflows/nodes/overview) and [**Prompt Nodes**](https://docs.vellum.ai/product/workflows/nodes/prompt-node) supports external memory integrations and scoped information passing between agents
+* [**Prompt chaining**](https://www.vellum.ai/blog/what-is-prompt-chaining) and branching logic ensures agents receive appropriately sized context windows
+
+Reducing Hallucination:
+
+* [**Evaluation and Observability**](https://docs.vellum.ai/product/metrics/out-of-the-box-metrics) provides continuous output comparison and scoring to identify conflicting agent outputs
+* [**Better context filtering**](https://docs.vellum.ai/product/documents/metadata-filtering) through [**RAG pipelines**](https://docs.vellum.ai/product/evaluation/evaluating-rag-pipelines) ensures agents work with accurate, relevant grounding information
+
+With the right design approach and right platform, like Vellum, that provide system-wide visibility and structure needed to build multi-agent workflows, teams can turn multi-agent experimentation into a reliable, efficient workflow cheat code.
+
+### **Ready to build multi agent systems that actually work on Vellum?**
+
+Start with Vellum's free tier to see how a scalable development infrastructure supercharged with the proper tools for context engineering transform your multi agent AI from failure to production grade.
+
+[**Get started with Vellum free →**](https://app.vellum.ai/signup)
+
+{{general-cta}}
+
+FAQs
+----
+
+**1) What is a multi-agent system?**
+
+A multi-agent system is a setup where multiple AI agents work together to complete highly specific or complex tasks. Each agent has its own role, context, or specialization to adress key pieces of a complex task. They often collaborate through coordinated workflows, shared context, or message passing.
+
+**2) What is the best architecture for multi agent AI systems?**
+
+It depends on your workflow. Use a supervisor pattern when central control is important, a hierarchical pattern when tasks follow a linear sequence, and a network (peer-to-peer) pattern when agents operate independently and coordinate via shared state. Platforms like **Vellum** make it easier to experiment with and compare these structures using visual workflows and prompt chaining.
+
+**3) How do I prevent agents in a multi agent system from contradicting each other?**
+
+Content engineering. Use context isolation, scoped prompts, shared memory, and message-passing rules. Agents should be aware of relevant system-wide decisions and avoid acting on conflicting assumptions, context engineering strategies help with this.
+
+**4) How can I make multi agent workflows more cost-efficient?**
+
+Minimize token usage by compressing context, limiting redundant messages, and only retrieving relevant information using RAG or similarity search. Systems like Vellum can help optimize context flow and token management automatically through prompt versioning and evaluation tools.
+
+**5) Can I dynamically activate agents based on task context or tool output?**
+
+Yes, dynamic agent routing allows workflows to trigger the right agent based on runtime data, decision state, or external signals. Vellum supports conditional logic and multi-step workflows for exactly this use case, helping teams automate complex AI behavior without heavy engineering.
+
+**6) How do I audit or replay multi agent runs for debugging?**
+
+Replay-ability comes from structured logging and state tracking. With Vellum, you can track agent prompts, outputs, and decision history—making it easy to debug, compare, and iterate safely on multi-agent pipelines.
+
+**7) What’s the role of context engineering in multi agent systems?**
+
+It’s the backbone of success. Context engineering ensures every agent gets the right mix of instructions, knowledge, and tool feedback without being overwhelmed by irrelevant or outdated information.
+
+**8) What kind of memory or state management do multi agent systems need?**
+
+A shared memory or state object is typically used so agents can remain loosely coupled but coordinated. This allows agents to asynchronously read, write, and react without needing direct communication.
+
+**9) What is the best tool or platform to build a multi agent system?**
+
+Vellum. It’s built specifically to support the complexities of multi-agent coordination—offering workflow orchestration, scoped prompts, prompt versioning, shared memory access, evaluation tooling, and rollback support. Whether you’re experimenting or deploying to production, Vellum gives you the infrastructure to make multi-agent systems actually work.
+
+**10) How do I know when to move from a single agent to a multi-agent system?**
+
+The shift makes sense once a single agent consistently struggles with scope, latency, or accuracy of a complex task. Signs include: repeated token overflows, conflicting outputs, or bottlenecks where specialized roles would add value. Start small with orchestration experiments, and scale only once you’ve validated that multiple agents provide measurable gains.
+
+**11) How do I keep multi-agent systems reliable as they grow more complex?**
+
+Reliability comes from controlled iteration: version every prompt, add evals for each agent role, and centralize observability so you can trace how agents interact. Vellum makes this straightforward with built-in evaluations, per-agent versioning, run-level traces, and rollback support, so complexity doesn’t turn into unpredictability.
+
+Extra resources
+---------------
+
+* [**2026 Guide to AI Agent Workflows →**](https://www.vellum.ai/blog/agentic-workflows-emerging-architectures-and-design-patterns)[**‍**](https://www.vellum.ai/llm-parameters-guide)
+* [**GPT-5 Prompt Guide →**](https://www.vellum.ai/blog/gpt-5-prompting-guide)
+* [**AI Agent Parameters Guide →**](https://www.vellum.ai/llm-parameters-guide)[**‍**](https://www.vellum.ai/blog/how-should-i-manage-memory-for-my-llm-chatbot)
+* [**AI Agent Memory Management Guide →**](https://www.vellum.ai/blog/how-should-i-manage-memory-for-my-llm-chatbot)[**‍**](https://www.vellum.ai/blog/prompt-engineering-tips-for-claude)
+
+### **Citations**
+
+[1] Anthropic. (2025). [How We Built Our Multi-Agent Research System](https://www.anthropic.com/engineering/built-multi-agent-research-system)
+
+[2] Kubiya. (2024). [Single Agent vs Multi Agent AI: Which Is Better?](https://www.kubiya.ai/blog/single-agent-vs-multi-agent-in-ai)
+
+[3] Cognition AI. (2024). [Don’t Build Multi-Agents](https://cognition.ai/blog/dont-build-multi-agents)
+
+[4] LangChain. (2024). [Context Engineering for Agents](https://blog.langchain.com/context-engineering-for-agents/)
+
+[5] Anna A Grigoryan (2025). [Why Do Multi-Agent LLM Systems Fail?](https://thegrigorian.medium.com/why-do-multi-agent-llm-systems-fail-14dc34e0f3cb)
+
+[6] Arxiv. (2025). [Why Do Multi-Agent LLM Systems Fail?](https://arxiv.org/abs/2503.13657)
+
+Agentic automation has changed the game for everyone, but when tasks become too complex, interdependent, and/or require deep SME context the limitations become abundantly clear.
+
+Teams are experiencing these blocks when pushing the boundaries of agent building by expanding single agent workflows to a multi agent systems.
+
+The workaround?
+
+Engineering context strategically into a multi agent system to manage complexity at scale.
+
+This blog explores multi-agent systems, context engineering frameworks, and practical best practices for teams ready to build working multi-agent solutions that actually work.
+
+Quick overview
+--------------
+
+Multi-agent systems are a powerful step beyond single-agent workflows, but they bring complexity. By layering in context engineering best practices, teams can scale coordination, reduce failures, and unlock production-grade performance with multi agent systems.
+
+This guide gives you the practical and actionable knowledge to confidently build multi-agent workflows that work.
+
+Why this matters
+----------------
+
+Most AI builders hit a ceiling with single agents once tasks become too complex. Multi-agent systems are emerging as the solution to break this ceiling. When engineered correctly with the right context they turn complex fragmentation into collaboration.
+
+For organizations serious about deploying agents in production, mastering these strategies is the difference between experiments that break and AI that makes it to production.
+
+What is a multi agent system?
+-----------------------------
+
+**Multi agent systems** coordinate multiple specialized agents to solve complex problems collaboratively.
+
+Each agent has a specific role and context window, working in parallel toward a shared output. Like human teams, they rely on clear role definition, scoped responsibilities, and synchronized outputs to succeed.
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/6896641eaabfb1036288ac4d_Single%20Agent%20vs%20Multi%20Agent%20AI.avif)
+
+Anthropic showcased a successful multi-agent research system that was organized with an Opus 4 lead agent managing coordinated Sonnet 4 specialized subagents that worked on tasks in parallel.
+
+This system outperformed a Opus 4 single-agent by 90.2% on internal research evaluations, with token usage explaining 80% of performance variance in their BrowseComp analysis [[1]](https://www.anthropic.com/engineering/built-multi-agent-research-system).
+
+Though Anthropic achieved phenomenal results using multi-agent systems, it isn’t fully clear whether this approach will work better for teams using single agents for their AI needs.
+
+### Are multi agent systems right for you?
+
+Though powerful, not every task calls for multiple AI agents. In fact, multi-agent systems can introduce complexity, coordination risk, and significantly higher token usage.
+
+Think about a task like generating automating product descriptions based on a few attributes (e.g. name, category, and key features).
+
+This is a straightforward task, that fits within a single context window, where the agent can handle prompt interpretation, structured output formatting, and language generation without needing help from specialized sub-agents.
+
+**Use a single agent when:**
+
+* Your task is linear or involves unified reasoning.
+* Real-time responses and low latency are important.
+* The problem fits within a single context window.
+
+Now, think about a workflow for deep research where the goal is to compare economic policies across countries using live data, expert analysis, and statistical indicators.
+
+This kind of task is too complex for one agent to handle well on its own, so using Anthropic’s approach as an example, there would need to be a lead agent responsible for overseeing the process and coordinating multiple specialized sub-agents.
+
+It looks like this:
+
+* One sub-agent would use Browse tools to pull recent economic news and government reports.
+* Another would query structured data sources (e.g. GDP, inflation, interest rates) and calculate key metrics using Calculator tools.
+* A third sub-agent could summarize expert commentary or academic literature.
+* The lead agent (Opus 4 in Anthropic’s case) would then synthesize all outputs, ensuring consistency, resolving contradictions, and generating a well-structured comparative analysis.
+
+With each agent operates with scoped instructions and context, the system  runs **i**n parallel, sustains accuracy, and avoids overloading any single agent with too much responsibility or information.
+
+**Use a multi agent system when:**
+
+* Tasks can be naturally split into subproblems.
+* Agents can specialize (e.g. research, planning, analysis).
+* Work can be parallelized or decomposed across roles.
+* You require external memory or broad tool orchestration.
+
+If those conditions aren’t met, a well-structured single-agent system may be more reliable and easier to maintain [[2]](https://www.kubiya.ai/blog/single-agent-vs-multi-agent-in-ai).
+
+A good rule of thumb is to start with a single-agent and scale to multi-agent architectures only after proving value and identifying a clear need for specialization or parallelism. Learn more about this approach by exploring our guide on [building agentic workflows](https://www.vellum.ai/blog/agentic-workflows-emerging-architectures-and-design-patterns) that scale on Vellum.
+
+Common orchestrations
+---------------------
+
+Multi-agent systems can be structured in different ways depending on how agents interact, delegate, and share state, ultimately shaping how the system coordinates work, manages failures, and distributes reasoning.
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/6896647c2cf8d5b597199770_Common%20Multi%20Agent%20Orchestration%20Patterns.avif)
+
+Here are the three most common patterns:
+
+* **Supervisor Pattern**‍  
+  + A central agent acts as a manager that delegates tasks to specialized sub-agents and integrating their outputs. This mirrors a traditional team structure and is useful for workflows that need tight oversight.
+
+* **Hierarchical Pattern**  
+  + Agents are arranged in a chain, where the output of one becomes the input for the next. This works well for sequential workflows like planning → research → summarization, where each stage builds on the previous.
+* **Network Pattern (Peer-to-Peer)**  
+  + Agents operate independently but share access to a shared state or memory layer. Coordination happens through updates to that state, making this ideal for collaborative or parallelized problem-solving.
+
+Choosing the right orchestration pattern depends on your task structure, agent specialization, and need for control versus autonomy.
+
+Managing complexity with context engineering
+--------------------------------------------
+
+Cognition found that the main issue with multi agent systems is that they are highly failure prone when agents work from conflicting assumptions or incomplete information, specifically noting that subagents often take actions based on conflicting assumptions that weren't established upfront [[3]](https://cognition.ai/blog/dont-build-multi-agents).
+
+This means failure will generally always boil down to missing context within the system. How to maintain this necessary context?
+
+[Context engineering](https://www.vellum.ai/blog/context-is-king-why-context-engineering-is-the-new-frontier-for-ai-agents). The defining principle is as follows:
+
+Build agents that factor in the collective knowledge and decisions of the entire system before acting.
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/689664b7cccb5fbac7cc68d2_Context%20Engineering%20Diagram.avif)
+
+It is quickly evolving as a practice of designing, managing, and maintaining the input context used by agents in multi-agent systems. It keeps operations in scope so agents can make informed decisions that guarantee successful outputs.
+
+### Understanding context types
+
+Ensuring success first comes by understanding that not all context is the same, and builders must be precise in the types of context they leverage when building these systems.
+
+Context types typically include:
+
+* Instructions: prompts, rules, few-shot examples, tool descriptions
+* Knowledge: domain facts, retrieved data, semantic memory
+* Tool feedback: prior decisions, API outputs, runtime signals
+
+Managing this across agents requires structured context engineering strategies [[4]](https://blog.langchain.com/context-engineering-for-agents/):
+
+1. Writing Context: Save information outside the context window so agents can reference it later (e.g. memory objects, files, or runtime state).
+2. Selecting Context: Retrieve only what’s needed at the moment by using RAG, similarity search, or filters to surface relevant data, instructions, or tools.
+3. Compressing Context: Summarize or trim past messages or tool outputs to prevent token bloat.
+4. Isolating Context: Give each agent a scoped window to avoid conflict or distraction.
+
+The idea is to leverage and ensure strategic injections of different context types, message passing, and coordination strategies when building multi agent systems, builders can ensure agents receive the right information dynamically as the multi-agent system runs.
+
+Here’s how its done.
+
+Context engineering best practices
+----------------------------------
+
+Effective multi agent systems require an architecture that encodes contextual awareness at the agent level by ensuring each agent has a precise understanding of its role, scope, dependencies, and decision boundaries.
+
+This begins by systematically answering the following design questions for every agent:
+
+1. **What decisions have other agents already made that will affect this agent's work?**
+   * In a multi agent customer support system, if the “triage agent” already classified the issue as a billing problem, the next agent (e.g. “solution agent”) should avoid reclassifying it or asking redundant intake questions.
+   * **Context approach:** Store decisions in shared state or memory and inject them into downstream prompts as structured flags (e.g. issue\_type: billing).
+2. **How do we prevent agents from making conflicting assumptions about the same task?**
+   * In Anthropic’s research system, multiple sub-agents were assigned to collect different types of information about a single topic. If there were no shared task framing, one agent might focus on sourcing recent quantitative data, while another could interpret the same topic through qualitative or outdated sources ultimately leading to mismatched assumptions or conflicting conclusions.
+   * **Context approach:** Inject a unified task description and shared assumptions into each agent’s context block (e.g. “focus on policy impacts from 2020 onward,” or “prioritize official government sources”), and record framing decisions in shared memory so all agents stay aligned.
+3. **What information from previous agent interactions is essential versus noise?**
+   * In a multi-agent writing system (e.g. outline → draft → refine), only key decisions like tone, voice, and audience should be passed forward — not raw brainstorm content or irrelevant tool outputs.
+   * **Context approach:** Use summarization and context compression (e.g. summary\_of\_prior\_steps) to reduce noise while preserving intent.
+4. **How do we maintain consistency across parallel agents without full context sharing?**
+   * When two agents independently summarize sections of the same research report, they may format or cite things differently.
+   * **Context approach:** Set formatting rules and shared stylistic instructions (e.g. APA citations, tone guidelines) as part of each agent’s prompt template.
+5. When agents work simultaneously, how do we avoid duplicated effort or contradictory outputs?
+   * In a workflow where one agent gathers data and another explains it, both might attempt to retrieve similar stats if unaware of each other’s roles.
+   * **Context approach:** Assign scoped responsibilities and dynamically reference shared memory to check what’s already been done (e.g. if "GDP data" exists in memory, skip retrieval).
+
+### TLDR;
+
+| Orchestration Pattern | Coordination Mechanism | Instructions | Knowledge | Tool Feedback | Replayability | Dynamic Tool Routing |
+| --- | --- | --- | --- | --- | --- | --- |
+| Supervisor | Message Passing (Direct) | High | Medium (optional) | High | Supported | Strong |
+| Hierarchical | Message Passing + Shared State (Light) | High | Medium (stage-specific) | High | Limited | Limited |
+| Network (Peer-to-Peer) | Shared State | Medium (static) | High | High | Strong | Strong |
+
+‍
+
+Common mistakes to avoid
+------------------------
+
+Here are the most common failure modes when building multi-agent systems, and how to design around them.
+
+| Failure Mode | Cause | Solution Strategy |
+| --- | --- | --- |
+| Token Sprawl | Redundant context shared across agents | Trim prompts, use Corpus-in-Context, compress tool output |
+| Coordination Drift | Misaligned roles, prompt changes | Modular prompt versioning, audit history, observability |
+| Context Overflow | Too much information in context window | External memory, scoped scratchpads, summarization |
+| Hallucination | Incomplete or conflicting grounding | Better context filtering, evaluation, memory QA |
+
+Token sprawl often becomes the blocker in multi agent system often consuming up to 15x more tokens than standard chat interactions, making them viable only for high-value workflows where the performance gains justify the cost [[1]](https://www.anthropic.com/engineering/built-multi-agent-research-system).
+
+Coordination drift poses major risks, especially when agents lack shared grounding, produce contradictory outputs, or depend on outdated intermediate steps [[5]](https://thegrigorian.medium.com/why-do-multi-agent-llm-systems-fail-14dc34e0f3cb). These issues become even more pronounced as systems scale due to the exponential growth in agent interactions and communication overhead [[6]](https://arxiv.org/abs/2503.13657).
+
+Context overflow requires careful information architecture, so by designing your system to pass only essential context between agents rather than full conversation histories, context overflow and subsequently hallucinations can be avoided.
+
+Scaling multi-agent systems without the proper tooling is incredibly hard; managing distributed prompts, coordinating across agents, and keeping everything observable isn’t something most teams can pull off.
+
+It takes the kind of infrastructure that is purpose-built to turn best practices into real, working systems.
+
+Enter Vellum.
+
+Building multi agent systems in Vellum
+--------------------------------------
+
+Vellum is designed to provide the infrastructure necessary to orchestrate complex agent systems, with a tooling and feature set that ensures mission critical accuracy at deployment.
+
+We provide a [robust toolkit](https://www.vellum.ai/blog/how-drata-built-an-enterprise-grade-ai-solution-with-vellum) for experimentation, evaluation, and production management. This is where [Vellum](https://www.vellum.ai/landing-pages/request-demo) becomes your control panel for building sophisticated agents.
+
+Here is how Vellum supports the coordination strategies and context patterns covered above:
+
+Solving Token Sprawl:
+
+* [**Corpus-in-Context**](https://www.vellum.ai/blog/how-to-optimize-long-context-prompts-with-corpus-in-context-prompting)and [**RAG Pipelines**](https://docs.vellum.ai/product/workflows/common-architectures/rag-system)pull in only the most relevant external knowledge with long-context optimization, eliminating redundant information sharing
+* [**Prompt Engineering Tools**](https://www.vellum.ai/products/prompt-engineering) enables dynamic, role-specific prompts using templating, ensuring each agent receives only necessary context
+
+Preventing Coordination Drift:
+
+* [**Prompt Sandbox**](https://docs.vellum.ai/product/prompts/collaboration) and [**Versioning**](https://docs.vellum.ai/product/deployments/deployment-lifecycle-management#deployment-versioning) provides safe testing environments to monitor prompt evolution and tag stable releases
+* [**Evaluation and Observability**](https://docs.vellum.ai/product/deployments/observability) enables regression testing and live monitoring of agent performance to catch drift early
+* [**Deployment and Rollbacks**](https://docs.vellum.ai/product/deployments/deployment-lifecycle-management) allows teams to safely revert prompt configurations without downtime when coordination issues arise
+
+Managing Context Overflow:
+
+* [**Workflow Orchestration**](https://docs.vellum.ai/product/workflows/nodes/overview) and [**Prompt Nodes**](https://docs.vellum.ai/product/workflows/nodes/prompt-node) supports external memory integrations and scoped information passing between agents
+* [**Prompt chaining**](https://www.vellum.ai/blog/what-is-prompt-chaining) and branching logic ensures agents receive appropriately sized context windows
+
+Reducing Hallucination:
+
+* [**Evaluation and Observability**](https://docs.vellum.ai/product/metrics/out-of-the-box-metrics) provides continuous output comparison and scoring to identify conflicting agent outputs
+* [**Better context filtering**](https://docs.vellum.ai/product/documents/metadata-filtering) through [**RAG pipelines**](https://docs.vellum.ai/product/evaluation/evaluating-rag-pipelines) ensures agents work with accurate, relevant grounding information
+
+With the right design approach and right platform, like Vellum, that provide system-wide visibility and structure needed to build multi-agent workflows, teams can turn multi-agent experimentation into a reliable, efficient workflow cheat code.
+
+### **Ready to build multi agent systems that actually work on Vellum?**
+
+Start with Vellum's free tier to see how a scalable development infrastructure supercharged with the proper tools for context engineering transform your multi agent AI from failure to production grade.
+
+[**Get started with Vellum free →**](https://app.vellum.ai/signup)
+
+{{general-cta}}
+
+FAQs
+----
+
+**1) What is a multi-agent system?**
+
+A multi-agent system is a setup where multiple AI agents work together to complete highly specific or complex tasks. Each agent has its own role, context, or specialization to adress key pieces of a complex task. They often collaborate through coordinated workflows, shared context, or message passing.
+
+**2) What is the best architecture for multi agent AI systems?**
+
+It depends on your workflow. Use a supervisor pattern when central control is important, a hierarchical pattern when tasks follow a linear sequence, and a network (peer-to-peer) pattern when agents operate independently and coordinate via shared state. Platforms like **Vellum** make it easier to experiment with and compare these structures using visual workflows and prompt chaining.
+
+**3) How do I prevent agents in a multi agent system from contradicting each other?**
+
+Content engineering. Use context isolation, scoped prompts, shared memory, and message-passing rules. Agents should be aware of relevant system-wide decisions and avoid acting on conflicting assumptions, context engineering strategies help with this.
+
+**4) How can I make multi agent workflows more cost-efficient?**
+
+Minimize token usage by compressing context, limiting redundant messages, and only retrieving relevant information using RAG or similarity search. Systems like Vellum can help optimize context flow and token management automatically through prompt versioning and evaluation tools.
+
+**5) Can I dynamically activate agents based on task context or tool output?**
+
+Yes, dynamic agent routing allows workflows to trigger the right agent based on runtime data, decision state, or external signals. Vellum supports conditional logic and multi-step workflows for exactly this use case, helping teams automate complex AI behavior without heavy engineering.
+
+**6) How do I audit or replay multi agent runs for debugging?**
+
+Replay-ability comes from structured logging and state tracking. With Vellum, you can track agent prompts, outputs, and decision history—making it easy to debug, compare, and iterate safely on multi-agent pipelines.
+
+**7) What’s the role of context engineering in multi agent systems?**
+
+It’s the backbone of success. Context engineering ensures every agent gets the right mix of instructions, knowledge, and tool feedback without being overwhelmed by irrelevant or outdated information.
+
+**8) What kind of memory or state management do multi agent systems need?**
+
+A shared memory or state object is typically used so agents can remain loosely coupled but coordinated. This allows agents to asynchronously read, write, and react without needing direct communication.
+
+**9) What is the best tool or platform to build a multi agent system?**
+
+Vellum. It’s built specifically to support the complexities of multi-agent coordination—offering workflow orchestration, scoped prompts, prompt versioning, shared memory access, evaluation tooling, and rollback support. Whether you’re experimenting or deploying to production, Vellum gives you the infrastructure to make multi-agent systems actually work.
+
+**10) How do I know when to move from a single agent to a multi-agent system?**
+
+The shift makes sense once a single agent consistently struggles with scope, latency, or accuracy of a complex task. Signs include: repeated token overflows, conflicting outputs, or bottlenecks where specialized roles would add value. Start small with orchestration experiments, and scale only once you’ve validated that multiple agents provide measurable gains.
+
+**11) How do I keep multi-agent systems reliable as they grow more complex?**
+
+Reliability comes from controlled iteration: version every prompt, add evals for each agent role, and centralize observability so you can trace how agents interact. Vellum makes this straightforward with built-in evaluations, per-agent versioning, run-level traces, and rollback support, so complexity doesn’t turn into unpredictability.
+
+Extra resources
+---------------
+
+* [**2026 Guide to AI Agent Workflows →**](https://www.vellum.ai/blog/agentic-workflows-emerging-architectures-and-design-patterns)[**‍**](https://www.vellum.ai/llm-parameters-guide)
+* [**GPT-5 Prompt Guide →**](https://www.vellum.ai/blog/gpt-5-prompting-guide)
+* [**AI Agent Parameters Guide →**](https://www.vellum.ai/llm-parameters-guide)[**‍**](https://www.vellum.ai/blog/how-should-i-manage-memory-for-my-llm-chatbot)
+* [**AI Agent Memory Management Guide →**](https://www.vellum.ai/blog/how-should-i-manage-memory-for-my-llm-chatbot)[**‍**](https://www.vellum.ai/blog/prompt-engineering-tips-for-claude)
+
+### **Citations**
+
+[1] Anthropic. (2025). [How We Built Our Multi-Agent Research System](https://www.anthropic.com/engineering/built-multi-agent-research-system)
+
+[2] Kubiya. (2024). [Single Agent vs Multi Agent AI: Which Is Better?](https://www.kubiya.ai/blog/single-agent-vs-multi-agent-in-ai)
+
+[3] Cognition AI. (2024). [Don’t Build Multi-Agents](https://cognition.ai/blog/dont-build-multi-agents)
+
+[4] LangChain. (2024). [Context Engineering for Agents](https://blog.langchain.com/context-engineering-for-agents/)
+
+[5] Anna A Grigoryan (2025). [Why Do Multi-Agent LLM Systems Fail?](https://thegrigorian.medium.com/why-do-multi-agent-llm-systems-fail-14dc34e0f3cb)
+
+[6] Arxiv. (2025). [Why Do Multi-Agent LLM Systems Fail?](https://arxiv.org/abs/2503.13657)
+
+ABOUT THE AUTHOR
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/689659d37540b34fdce81cbf_Webflow%20Heeadshot.avif)
+
+Nicolas Zeeb
+
+Technical Content Lead
+
+Nick is Vellum’s technical content lead, writing about practical ways to use both voice and text-based agents at work. He has hands-on experience automating repetitive workflows so teams can focus on higher-value work.
+
+ABOUT THE reviewer
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68d4713e802d00e15cf5e695_anita-photo.avif)
+
+Anita Kirkovska
+
+Founding Growth Lead
+
+An AI expert with a strong ML background, specializing in GenAI and LLM education. A former Fulbright scholar, she leads Growth and Education at Vellum, helping companies build and scale AI products. She conducts LLM evaluations and writes extensively on AI best practices, empowering business leaders to drive effective AI adoption.
+
+No items found.
+
+lAST UPDATED
+
+Dec 3, 2025
+
+![](https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg)
+
+share post
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/63f416b32254e804f4d8b06d_icon-check-v1-dataplus-template.svg)
+
+Expert verified
+
+![](https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg)
+
+Related Posts
+
+[View More](#)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68f62df5488ea1fb9508c764_Vellum%20Standard%20Blog%20Cover%20Small.png)
+
+![](https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg)
+
+All
+
+December 12, 2025
+
+•
+
+7 min
+
+How we use coding agents to 2x engineering output
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68f62df5488ea1fb9508c764_Vellum%20Standard%20Blog%20Cover%20Small.png)
+
+![](https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg)
+
+LLM basics
+
+December 12, 2025
+
+•
+
+8 min
+
+GPT-5.2 Benchmarks
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68f62df5488ea1fb9508c764_Vellum%20Standard%20Blog%20Cover%20Small.png)
+
+![](https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg)
+
+LLM basics
+
+December 4, 2025
+
+•
+
+8 min
+
+Top 12 AI Workflow Platforms
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68f62df5488ea1fb9508c764_Vellum%20Standard%20Blog%20Cover%20Small.png)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/66f51fbc4ccaf48d43a691b6_Icon.svg)
+
+Product Updates
+
+December 3, 2025
+
+•
+
+12 min
+
+Vellum Product Update | November
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68dc68b98448eed3b5997436_article%20cover%20alternative.jpeg)
+
+![](https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg)
+
+Model Comparisons
+
+November 27, 2025
+
+•
+
+18 min
+
+Flagship Model Report: Gpt-5.1 vs Gemini 3 Pro vs Claude Opus 4.5
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68f62df5488ea1fb9508c764_Vellum%20Standard%20Blog%20Cover%20Small.png)
+
+![](https://cdn.prod.website-files.com/plugins/Basic/assets/placeholder.60f9b1840c.svg)
+
+LLM basics
+
+November 27, 2025
+
+•
+
+14 min
+
+Gumloop Alternatives (Reviewed & Explained)
+
+The Best AI Tips — Direct To Your Inbox
+
+Latest AI news, tips, and techniques
+
+Specific tips for Your AI use cases
+
+No spam
+
+Thank you! Your submission has been received!
+
+Oops! Something went wrong while submitting the form.
+
+*Each issue is packed with valuable resources, tools, and insights that help us stay ahead in AI development. We've discovered strategies and frameworks that boosted our efficiency by 30%, making it a must-read for anyone in the field.*
+
+Marina Trajkovska
+
+Head of Engineering
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/67054ff3cd8d0a6dcdb69790_odyseek-logo.avif)
+
+*This is just a great newsletter. The content is so helpful, even when I’m busy I read them.*
+
+Jeremy Hicks
+
+Solutions Architect
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/6706876bf08578fa9b00cad4_image%201728072179.webp)
+
+Experiment, Evaluate, Deploy, Repeat.
+-------------------------------------
+
+AI development doesn’t end once you've defined your system. Learn how Vellum helps you manage the entire AI development lifecycle.
+
+[Prompting
+
+Current Page](/products/prompt-engineering)[Orchestration
+
+Current Page](/products/orchestration)[Evaluation
+
+Current Page](/products/evaluation)[Retrieval
+
+Current Page](/products/retrieval)[Deployment
+
+Current Page](/products/deployments)[Monitoring
+
+Current Page](#)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/66f3e54ef5f61de512598e24_circle-logo.avif)
+
+x
+
+[Book a Demo](/landing-pages/request-demo)
+
+or
+
+[Learn more](/products/orchestration)
+
+Build AI agents by chatting with AI
+
+RESOURCES
+
+* [Case Studies](/our-blog?category=Case+Studies)
+* [Reasoning models](/reasoning-models)
+* [Guides](/our-blog?category=Guides)
+* [Product Updates](/our-blog?category=Product+Updates)
+* [Model Comparison](/our-blog?category=Model+Comparisons)
+* [Documentation](https://docs.vellum.ai/help-center/welcome/welcome)
+* [LLM Leaderboard](/llm-leaderboard)
+
+PRODUCTS
+
+* [Prompt Engineering](/products/prompt-engineering)
+* [Document Retrieval](/products/retrieval)
+* [Orchestration](/products/orchestration)
+* [evaluations](/products/evaluation)
+* [Deployments](/products/deployments)
+* [Monitoring](/products/monitoring)
+* [SDK](/products/workflows-sdk)
+
+COMPANY
+
+* [Blog](/blog)
+* [Careers](/careers)
+* [Contact Us](/landing-pages/request-demo)
+
+[Affiliate program rules](/docs/affiliate-program-rules)
+
+[Terms of Use](/docs/vellum-terms-of-use)
+
+[Privacy Policy](/docs/privacy-policy)
+
+SOCIALS
+
+* [LinkedIn](https://www.linkedin.com/company/vellumai)
+* [Twitter](https://twitter.com/vellum_ai)
+* [Youtube](https://www.youtube.com/@Vellum_AI)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/66e9863ee999927f01bd594b_AICPA%7CSOC.avif)![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/66e9863efaf7621b2b394a4e_HIPAA.avif)
+
+Thank you! Your submission has been received!
+
+Oops! Something went wrong while submitting the form.
+
+[How we use coding agents to 2x engineering output
+
+Learn how Vellum engineers built a system of AI coding agents that doubled engineering velocity throughput in six months.](/blog/how-we-use-coding-agents-to-2x-engineering-output)
+
+[GPT-5.2 Benchmarks
+
+Explore this breakdown of OpenAI’s GPT-5.2 performance across coding, reasoning, math, long-horizon planning, multimodal understanding, and tool use benchmarks to learn what results actually mean for building more powerful AI agents.](/blog/gpt-5-2-benchmarks)
+
+[Top 12 AI Workflow Platforms
+
+Explore this guide to discover the top 12 AI workflow platforms we've reviewed and compared to help you choose the solution that's best fit for you and your team.](/blog/top-12-ai-workflow-platforms-1225)
+
+[Vellum Product Update | November
+
+Workflow triggers, multimodal outputs, 40+ integrations, and other updates making agent building easier and faster.](/blog/vellum-product-update-november-2025)
+
+[Flagship Model Report: Gpt-5.1 vs Gemini 3 Pro vs Claude Opus 4.5
+
+Compare GPT-5.1, Gemini 3 Pro, and Claude Opus 4.5 across coding, reasoning, multimodal, and safety benchmarks, and see the key trends defining the next wave of frontier AI and AI agent building.](/blog/flagship-model-report)
+
+[Gumloop Alternatives (Reviewed & Explained)
+
+Explore this 2026 guide on the top Gumloop alternatives to easily evaluate and choose the best AI automation platform for your business and use cases.](/blog/gumloop-alternatives)
+
+[AI Voice Agent Platforms Guide
+
+Learn what AI voice agents are, how they work, and compare the top 10 platforms in 2026 with side by side rankings on pricing, latency, integrations, and compliance.](/blog/ai-voice-agent-platforms-guide)
+
+[Claude Opus 4.5 Benchmarks
+
+Learn about Claude Opus 4.5’s latest benchmarks and compare it to GPT-5.1 and Gemini 3 Pro to understand what the best models are for your AI agents.](/blog/claude-opus-4-5-benchmarks)
+
+[Gumloop vs. n8n vs. Vellum (Platform Comparison)
+
+A practical 2026 comparison of Gumloop, n8n, and Vellum that breaks down who each platform is for, what they do well, where they fall short to help you find the right fit for your agentic solution.](/blog/gumloop-vs-n8n-vs-vellum)
+
+[Google Gemini 3 Benchmarks
+
+Explore this breakdown of Gemini 3 Pro’s benchmarks and performance across reasoning, math, multimodal, and agentic benchmark to learn what results actually mean for building more powerful AI agents.](/blog/google-gemini-3-benchmarks)
+
+[AI Agent Use Cases Guide to Unlock AI ROI
+
+Explore AI agent use cases by industry with real examples, ROI benchmarks, and a simple plan to begin automating workflows today to unlock AI nativity and ROI](/blog/ai-agent-use-cases-guide-to-unlock-ai-roi)
+
+[Beginners Guide to Building AI Agents
+
+A practical beginner guide to buildAI agents. Learn what they are, how they work, and build one fast with Vellum’s no-code Agent Builder and AI Apps.](/blog/beginners-guide-to-building-ai-agents)
+
+[Vellum Product Update | October
+
+Native integrations, Agent Builder Threads, and upgrades that make agent building faster than ever in Vellum.](/blog/vellum-product-update-october-2025)
+
+[I’m done building AI agents
+
+These are the four lessons Sidd and the Vellum engineers learned from creating an agent that builds other agents, and why the future of AI development isn’t drag-and-drop, it’s describe-and-build.](/blog/im-done-building-ai-agents)
+
+[AI transformation playbook
+
+Learn how to build an AI-native organization in 2026 with this comprehensive playbook for executing a successful AI trasnformation for your business.](/blog/ai-transformation-playbook)
+
+[The Top Enterprise AI Automation Platforms (Guide)
+
+Discover the best enterprise AI automation platforms of 2026. Compare leading platforms like Vellum, Microsoft Power Automate, AWS Bedrock, and more to find the right platform for building, testing, and managing AI agents safely at scale.](/blog/guide-to-enterprise-ai-automation-platforms)
+
+[The Best AI Workflow Builders for Automating Business Processes
+
+Discover the top AI workflow builders of 2026 and learn how to evaluate, compare, and implement tools that streamline and scale business automation.](/blog/best-ai-workflow-builders-for-automating-business-processes)
+
+[Complete Guide to No Code AI Workflow Automation Tools
+
+Use this compressive guide to compare the top no-code AI workflow automations tools of 2026. See criteria, pros and cons, and pricing to find your teams best fit.](/blog/no-code-ai-workflow-automation-tools-guide)
+
+[OpenAI's Agent Builder Explained
+
+A breakdown of OpenAI’s new Agent Builder and what it signals for the future of building and deploying AI agents.](/blog/openais-agent-builder-explained)
+
+[Vellum Product Update | September
+
+Agent Builder (beta), Custom Nodes, AI Apps, Image & Document inputs, and more updates for faster and more complex agent building in Vellum.](/blog/vellum-product-update-september-2025)
+
+[A practical guide to AI automation
+
+Discover how AI automations help teams move faster and focus on higher-value work. Follow this guide to learn the practical ways to enable every team with AI.](/blog/ai-automation-guide)
+
+[Top Low-code AI Agent Platforms for Product Managers
+
+Learn and compare the best low-code AI agent platforms for product managers to move faster, cut dependencies, and scale AI safely in 2026.](/blog/top-low-code-ai-agent-platforms-for-product-managers)
+
+[The Best AI Agent Frameworks For Developers
+
+Learn how to choose the best AI agent framework for developers in 2026 through our expert guidance to lead you to the perfect solution.](/blog/top-ai-agent-frameworks-for-developers)
+
+[Introducing AI Apps: A new interface to interact with AI workflows
+
+AI Apps have been launched to unlock Workflows for your entire org. AI Apps in Vellum provide real-time, no-code workflow executions and seamless sharing.](/blog/ai-apps)
+
+[Top low‑code AI workflow automation tools
+
+Discover the top 10 low-code AI workflow automation tools of 2026. Compare features, use cases, and tradeoffs to choose the best platform for your team.](/blog/top-low-code-ai-workflow-automation-tools)
+
+[MCP UI & The Future of Agentic Commerce
+
+Learn about MCP UI and how it enables AI agents with the missing UI layer for the future of agentic commerce.](/blog/mcp-ui-and-the-future-of-agentic-commerce)
+
+[Google's AP2: A new protocol for AI agent payments
+
+How verifiable mandates are creating a secure foundation for AI-driven commerce.](/blog/googles-ap2-a-new-protocol-for-ai-agent-payments)
+
+[We don’t speak JSON
+
+Explore why forcing LLMs to output structured data is a flawed paradigm, and what might come next for developers.](/blog/we-dont-speak-json)
+
+[Top 13 AI Agent Builder Platforms for Enterprises
+
+Explore our guide on 2026's top 13 AI agent builder platforms to easily learn and compare the best solution for your enterprise.](/blog/top-13-ai-agent-builder-platforms-for-enterprises)
+
+[Top 12 AI Workflow Platforms
+
+Explore this guide to discover the top 12 AI workflow platforms we've reviewed and compared to help you choose the solution that's best fit for you and your team.](/blog/top-ai-workflow-platform)
+
+[How Marveri enabled lawyers to shape AI products without blocking developers
+
+Learn how Marveri's lawyers use Vellum to build and evaluate AI workflows and save countless engineering hours.](/blog/marveri-case-study)
+
+[The ultimate LLM agent build guide
+
+Follow this practical guide to learn how to build effective LLM agents for yourself, your team or your customers.](/blog/the-ultimate-llm-agent-build-guide)
+
+[Vellum Product Update | August
+
+MCP-powered Agent Nodes, public Workflow sharing, and a new Workflow Console for easier, collaborative building on Vellum.](/blog/vellum-product-update-august-2025)
+
+[How Coursemojo Sped Up AI Delivery by 6+ Months
+
+Learn how Coursemojo uses Vellum to unlock engineering productivity and deploy AI-powered edTech solutions faster.](/blog/coursemojo-case-study)
+
+[15 Best n8n Alternatives: Reviewed & Compared
+
+We reviewed and compared 27 n8n alternatives to help you evaluate 2026's top 15 best n8n alternatives for your team and use case.](/blog/best-n8n-alternatives)
+
+[How to write effective prompts for GPT-5
+
+Master the art of prompting GPT-5 with 17 actionable tips that improve speed, accuracy, and consistency. Learn how to structure and refine prompts for optimal results.](/blog/gpt-5-prompting-guide)
+
+[Partnering with Composio to Help You Build Better AI Agents
+
+Building AI agents is 10x easier with more than 10,000 tools and built-in tooling support for your LLMs](/blog/vellum-composio-new-partnership-for-ai-agent-building)
+
+[Vellum Product Update | July
+
+Upgraded Environments, Workflow, and Prompt Builder plus a new Agent Node for faster and easier building on Vellum.](/blog/vellum-product-update-july-2025)
+
+[Best practices for building AI multi agent system
+
+Understand the basics of AI multi agent systems, their benefits, and what best practices and approaches to consider before you start building one.](/blog/multi-agent-systems-building-with-context-engineering)
+
+[GPT-5 Benchmarks
+
+See how GPT-5 performs across benchmarks; with a big focus on health](/blog/gpt-5-benchmarks)
+
+[OpenAI o3 vs gpt-oss 120b
+
+Just another eval confirming 90% discount with highest performance from GPT-OSS 120b.](/blog/analysis-openai-o3-vs-gpt-oss-120b)
+
+[Understanding your agent’s behavior in production
+
+You can’t improve what you can’t see. Start tracking every decision your agent makes with observability tools like Vellum. Trusted by teams in legal, healthcare, and retail to build reliable agents.](/blog/understanding-your-agents-behavior-in-production)
+
+[Subliminal Learning in LLMs
+
+LLMs carry hidden traits in their data and we have no idea how.](/blog/subliminal-learning-in-llms)
+
+[Why ‘Context Engineering’ is the New Frontier for AI Agents
+
+You can’t have effective agents without context engineering.](/blog/context-is-king-why-context-engineering-is-the-new-frontier-for-ai-agents)
+
+[Introducing Vellum Agent Builder
+
+Go from idea to AI workflow in seconds and continue to build in the UI or your IDE.](/blog/introducing-vellum-copilot)
+
+[10 Humanloop Alternatives in 2025
+
+A side-by-side look at Humanloop and 10 other LLM platforms.](/blog/top-humanloop-alternatives-in-2025)
+
+[Introducing Environments in Vellum: Isolate, Promote, and Deploy with Confidence
+
+A first-class way to manage your work across Development, Staging, and Production.](/blog/introducing-environments-in-vellum-isolate-promote-and-deploy-with-confidence)
+
+[Built-In Tool Calling for Complex Agent Workflows
+
+Introducing the Agent Node in Vellum Workflows: built-in support for multi-tool use with automatic schema generation, loop logic and context tracking.](/blog/built-in-tool-calling-for-complex-agent-workflows)
+
+[Introducing Custom Docker Images & Custom Nodes
+
+Complete control over the business logic and runtime of your AI workflows in Vellum.](/blog/introducing-custom-docker-images-custom-nodes)
+
+[Vellum Workflows SDK is Generally Available
+
+Full control in code and real-time visibility in UI, built for teams shipping reliable AI.](/blog/vellum-workflows-sdk-is-generally-available)
+
+[Announcing our $20m Series A
+
+AI Development needs a standard & we’re building it at Vellum](/blog/announcing-our-20m-series-a)
+
+[Vellum Product Update | May & June
+
+AI-powered features and easier ways to customize and build together, across both the SDK and visual builder.](/blog/product-update-may-june)
+
+[Big Ideas from the AI Engineer World’s Fair
+
+What’s shaping AI products, agents, and infrastructure in 2025.](/blog/top-takeaways-from-the-ai-engineer-worlds-fair)
+
+[Build AI Products Faster: Top Development Platforms Compared
+
+Compare top AI platforms for fast, reliable development in 2025.](/blog/build-ai-products-faster-top-development-platforms-compared)
+
+[​​How GravityStack Cut Credit Agreement Review Time by 200% with Agentic AI
+
+Helping a leading financial institution speed up legal reviews, without compromising quality.](/blog/how-gravitystack-cut-credit-agreement-review-time-by-200-with-agentic-ai)
+
+[How the Best Product and Engineering Teams Ship AI Solutions
+
+Four core practices that enable teams to move 100x faster, without sacrificing reliability.](/blog/how-the-best-product-and-eng-teams-ship-ai-solutions)
+
+[Evaluation: Claude 4 Sonnet vs OpenAI o4-mini vs Gemini 2.5 Pro
+
+Analyzing the difference in performance, cost and speed between the world's best reasoning models.](/blog/evaluation-claude-4-sonnet-vs-openai-o4-mini-vs-gemini-2-5-pro)
+
+[Document Data Extraction in 2026: LLMs vs OCRs
+
+A choice dependent on specific needs, document types and business requirements.](/blog/document-data-extraction-llms-vs-ocrs)
+
+[How to continuously improve your AI Assistant using Vellum
+
+Capture edge cases in production and fix them in couple of minutes without redeploying you application.](/blog/how-to-continuously-improve-your-ai-assistant-using-vellum)
+
+[How to connect a Vellum AI Workflow with your Lovable app
+
+Build a functional chatbot using Vellum AI Workflows and Lovable with just a few prompts.](/blog/how-to-connect-a-vellum-ai-workflow-to-a-lovable-app)
+
+[A Guide to LLM Observability
+
+Think your APM tool has your AI covered? Think again. LLMs need their own observability playbook.](/blog/a-guide-to-llm-observability)
+
+[Vellum Product Update | April 2025
+
+Vellum Product Update - April 2025](/blog/vellum-product-update-april-2025)
+
+[How to evaluate an LLM evaluation framework
+
+A quick guide to picking the right framework for testing your AI workflows.](/blog/how-to-evaluate-an-llm-evaluation-framework)
+
+[How does MCP work
+
+Everything you need to understand MCP and how to set up both the client and server to use it.](/blog/how-does-mcp-work)
+
+[Four Reasons Enterprise AI Projects Get Stuck
+
+A wake up call to not underestimate the unique challenges of working with LLMs.](/blog/four-reasons-enterprise-ai-projects-get-stuck)
+
+[MCP: The Hype vs. Reality
+
+LLMs are stepping outside the sandbox with MCP. Should you let them?](/blog/mcp-the-hype-vs-reality)
+
+[Vellum Product Update | March 2025
+
+Vellum Product Update - March 2025 - Prompt Diffing and real-time monitoring integrations to GA of our Workflows SDK and PDF inputs](/blog/vellum-product-update-march-2025)
+
+[How Drata built an enterprise-grade AI solution with Vellum
+
+See how Drata leveraged Vellum to build enterprise-grade AI workflows that enhance GRC automation.](/blog/how-drata-built-an-enterprise-grade-ai-solution-with-vellum)
+
+[How to evaluate your AI product if you don’t have ground truth data
+
+Ground truths help build confidence, but they shouldn’t block progress.](/blog/how-to-evaluate-your-ai-product-if-you-dont-have-ground-truth-data)
+
+[Native integration with IBM’s Granite models
+
+Support for IBM granite models in Vellum.](/blog/native-integration-with-ibms-granite-models)
+
+[How DeepScribe Builds Clinician Trust by Iterating on AI Feedback 40% Faster
+
+Learn how DeepScribe uses Vellum to refine AI, act on feedback, and build clinician trust.](/blog/how-deepscribe-builds-clinician-trust-by-iterating-on-ai-feedback-40-faster)
+
+[Automating PR Reviews for Dummies
+
+Time to see if I’ve automated myself out of a job.](/blog/automating-pr-reviews-for-dummies)
+
+[Vellum Product Update | February 2025
+
+This month we improved how you find models, preview Workflows SDK code, and more!](/blog/vellum-product-update-february-2025)
+
+[GPT-4.5 vs Claude 3.7 Sonnet
+
+Comparing GPT-4.5 and Claude 3.7 Sonnet on cost, speed, SAT math equations, and adaptive reasoning skills.](/blog/gpt-4-5-vs-claude-3-7-sonnet)
+
+[GPT 4.5 is here: Better, but not the best
+
+Feels more natural, hallucinates less, can be persuaded—and it’s not a game-changer.](/blog/gpt-4-5-is-here-heres-how-good-this-model-is)
+
+[Claude 3.7 Sonnet vs OpenAI o1 vs DeepSeek R1
+
+Learn how the latest Anthropic's model compares to similar top-tier reasoning models on the market.](/blog/claude-3-7-sonnet-vs-openai-o1-vs-deepseek-r1)
+
+[How RelyHealth Deploys Healthcare AI Solutions 100x Faster
+
+Learn how Vellum enables Rely Health to rapidly build, test, and deploy AI-powered patient care solutions.](/blog/how-relyhealth-deploys-healthcare-ai-solutions-faster-with-vellum)
+
+[What is Agentic RAG?
+
+Discover how combining agents with RAG can make your AI workflows more context-aware, and proactive.](/blog/agentic-rag)
+
+[How can agentic capabilities be deployed in production today?
+
+A practical guide to deploying agentic capabilities: what works, what doesn’t, and how to keep it reliable in production.](/blog/how-can-agentic-capabilities-be-deployed-in-production-today)
+
+[The Six Levels of Agentic Behavior
+
+A look at AI's evolution from basic, rule-based systems to fully creative agentic workflows.](/blog/levels-of-agentic-behavior)
+
+[Vellum Product Update | January 2025
+
+Vellum 2025: Workflows SDK Beta, self-serve org setup, and new model support!](/blog/vellum-product-update-january-2025)
+
+[How Revamp Reliably Runs 15M+ LLM Executions in Production
+
+Learn how to optimize prompt versioning, debug efficiently, and make real-time updates to boost AI performance.](/blog/how-revamp-uses-vellum-to-reliably-run-15m-llm-executions-in-production)
+
+[Analysis: OpenAI o1 vs DeepSeek R1
+
+Explore how O1 and R1 perform on well-known reasoning puzzles—now tested in new contexts.](/blog/analysis-openai-o1-vs-deepseek-r1)
+
+[Claude 3.7 Sonnet: Can It Actually Reason?
+
+Evaluating the 'thinking' of Claude 3.7 Sonnet and other reasoning models to understand how they really reason.](/blog/claude-sonnet-can-it-reason)
+
+[Breaking down the DeepSeek-R1 training process—no PhD required
+
+Learn how DeepSeek achieved OpenAI o1-level reasoning with pure RL and solved challenges through multi-stage training.](/blog/the-training-of-deepseek-r1-and-ways-to-use-it)
+
+[Vellum Product Update | December 2024
+
+Unwrap Vellum's latest features: optional inputs, error handling, JSON indexing!](/blog/vellum-product-update-december-2024)
+
+[Capture User Feedback for AI Testing
+
+Capture and use end-user feedback as ground truth data to improve your AI system’s accuracy.](/blog/capture-user-feedback-for-ai-testing)
+
+[What to do when an LLM request fails
+
+Rate limiting and downtime are common issues with LLMs — here’s how to manage it in production.](/blog/what-to-do-when-an-llm-request-fails)
+
+[Vellum Product Update | November 2024
+
+Something special is coming, plus new models and quality of life improvements](/blog/vellum-product-update-november-2024)
+
+[Llama 3.3 70b vs GPT-4o
+
+Learn how the latest model from Meta, Llama 3.3 70b compares to GPT-4o on three tasks (math, reasoning, classification). Plus compare latency, cost and throughput.](/blog/llama-3-3-70b-vs-gpt-4o)
+
+[Native support for SambaNova inference in Vellum
+
+Now you can run Llama 3.1 405b, with 200 t/s via SambaNova on Vellum!](/blog/native-support-for-sambanova-inference-in-vellum)
+
+[Introducing Subworkflows (tools) for modular, reusable AI logic
+
+Learn how to build modular, reusable, and version-controlled tools (subworkflows) to keep your AI workflows efficient and maintainable.](/blog/introducing-subworkflows-tools-for-modular-reusable-ai-logic)
+
+[AI Development Survey: Help us build the ultimate AI changelog
+
+Share your team’s AI process in our 4-minute anonymous survey. Get early insights and a chance to win a MacBook M4 Pro.](/blog/announcing-the-ai-impact-and-adoption-survey)
+
+[Synthetic Test Case Generation for LLM Evaluation
+
+Easily test your AI workflows with Vellum—generate tons of test cases automatically and catch those tricky edge cases.](/blog/synthetic-test-case-generation-for-llm-evaluation)
+
+[Running Arbitrary Code in Workflows & Evals
+
+Write and execute Python or TypeScript directly in your workflow](/blog/running-arbitrary-code-in-workflows-evals)
+
+[Introducing Vellum Tracing and Graph view
+
+New debugging features for AI workflows to get visibility down to every decision and detail](/blog/introducing-vellum-tracing-and-graph-view)
+
+[Vellum Product Update | October 2024
+
+Workflow execution timeline revamp, higher performance for evals, improved Map node debugging and more](/blog/vellum-product-update-october-2024)
+
+[Announcing Native Support for Cerebras Inference in Vellum
+
+Starting today, you can unlock 2,100 t/s with Llama 3.1 70B in Vellum for real-time AI apps.](/blog/announcing-native-support-for-cerebras-inference-in-vellum)
+
+[100 Must-Know AI Facts and Statistics for 2025
+
+Discover 100 AI facts and statistics from 2024, covering trends across healthcare, finance, education, and more—plus predictions for 2025.](/blog/must-know-ai-facts-and-statistics)
+
+[Reintroducing Vellum for 2025
+
+We’re simplifying the complex world of AI development for teams of all sizes.](/blog/reintroducing-vellum-for-2025)
+
+Build AI agents in minutes with Vellum
+
+Build agents that take on the busywork and free up hundreds of hours. No coding needed, just start creating.
+
+[Try Vellum for free](/landing-pages/request-demo)
+
+General CTA component, Use {{general-cta}}
+------------------------------------------
+
+Build AI agents in minutes with Vellum
+
+Build agents that take on the busywork and free up hundreds of hours. No coding needed, just start creating.
+
+[Try Vellum for free](https://app.vellum.ai/signup)
+
+General CTA component  [For enterprise], Use {{general-cta-enterprise}}
+-----------------------------------------------------------------------
+
+The best AI agent platform for enterprises
+
+Production-grade rigor in one platform: prompt builder, agent sandbox, and built-in evals and monitoring so your whole org can go AI native.
+
+[Learn more](https://www.vellum.ai/enterprise)
+
+[Dynamic] Ebook CTA component using the Ebook CMS filtered by name of ebook. Use {{ebook-cta}} and add a Ebook reference in the article
+---------------------------------------------------------------------------------------------------------------------------------------
+
+Call duration
+
+30 mins
+
+15 mins30 mins
+
+[This is some text inside of a div block.](#)
+
+Thank you!   
+Your submission has been received!
+
+Oops! Something went wrong while submitting the form.
+
+[Button Text](#)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/68a331a887e9ebcf28d32ecf_Cover%20Back.svg)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/68beea5a9152bd0c63efd69c_Book%20Cover%20Template%20(1).png)
+
+LLM leaderboard CTA component. Use {{llm-cta}}
+----------------------------------------------
+
+Check our LLM leaderboard
+
+Compare all open-source and proprietary model across different tasks like coding, math, reasoning and others.
+
+[Go to Leaderboard](/llm-leaderboard)
+
+Case study CTA component (ROI) = {{roi-cta}}
+--------------------------------------------
+
+40% cost reduction on AI investment
+
+Learn how Drata’s team uses Vellum and moves fast with AI initiatives, without sacrificing accuracy and security.
+
+[Read case study](https://www.vellum.ai/blog/how-drata-built-an-enterprise-grade-ai-solution-with-vellum)
+
+Case study CTA component (cutting eng overhead) = {{coursemojo-cta}}
+--------------------------------------------------------------------
+
+6+ months on engineering time saved
+
+Learn how CourseMojo uses Vellum to enable their domain experts to collaborate on AI initiatives, reaching 10x of business growth without expanding the engineering team.
+
+[Read case study](https://www.vellum.ai/blog/coursemojo-case-study)
+
+Case study CTA component (Time to value) = {{time-cta}}
+-------------------------------------------------------
+
+100x faster time to deployment for AI agents
+
+See how RelyHealth uses Vellum to deliver hundreds of custom healthcare agents with the speed customers expect and the reliability healthcare demands.
+
+[Read case study](https://www.vellum.ai/blog/how-relyhealth-deploys-healthcare-ai-solutions-faster-with-vellum)
+
+[Dynamic] Guide CTA component using Blog Post CMS, filtering on Guides’ names
+-----------------------------------------------------------------------------
+
+100x faster time to deployment for AI agents
+
+See how RelyHealth uses Vellum to deliver hundreds of custom healthcare agents with the speed customers expect and the reliability healthcare demands.
+
+[Read guide](#)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.avif)
+
+New CTA
+
+Sorts the trigger and email categories
+
+[Book a Demo](https://app.vellum.ai/onboarding/agent-builder/signup)
+
+Dynamic template box for healthcare, Use {{healthcare}}
+-------------------------------------------------------
+
+### Start with some of these healthcare examples
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/689e4f0f7b7754b28d5ebf70_Square%20Icon%20Illustration%20Colored.svg)
+
+SOAP Note Generation Agent
+
+Extract subjective and objective info, assess and output a treatment plan.
+
+[Try it](/template/soap-note-generation)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/689e4f0f7b7754b28d5ebf70_Square%20Icon%20Illustration%20Colored.svg)
+
+Prior authorization review agent
+
+Reviews prior authorization packets, checks them against plan criteria and outputs JSON
+
+[Try it](/template/prior-authorization-review-agent)
+
+Dynamic template box for insurance, Use {{insurance}}
+-----------------------------------------------------
+
+### Start with some of these insurance examples
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Insurance claims automation agent
+
+Collect and analyze claim information, assess risk and verify policy details.
+
+[Try it](/template/insurance-claims-automation-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+AI agent for claims review
+
+Review healthcare claims, detect anomalies and benchmark pricing.
+
+[Try it](/template/ai-agent-for-claims-review-and-error-detection)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Agent that summarizes lengthy reports (PDF -> Summary)
+
+Summarize all kinds of PDFs into easily digestible summaries.
+
+[Try it](/template/pdf-document-summarization)
+
+Dynamic template box for eCommerce, Use {{ecommerce}}
+-----------------------------------------------------
+
+### Start with some of these eCommerce examples
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68a46a1bfaa748c37717aeff_Square%20Icon%20Illustration%20Colored%20(2).svg)
+
+E-commerce shopping agent
+
+Check order status, manage shopping carts and process returns.
+
+[Try it](/template/e-commerce-shopping-agent)
+
+Dynamic template box for Marketing, Use {{marketing}}
+-----------------------------------------------------
+
+### Start with some of these marketing examples
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Turn LinkedIn Posts into Articles and Push to Notion
+
+Convert your best Linkedin posts into long form content.
+
+[Try it](/template/generate-article-in-notion)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Competitor research agent
+
+Scrape relevant case studies from competitors and extract ICP details.
+
+[Try it](/template/competitor-research-agent)
+
+Dynamic template box for Sales, Use {{sales}}
+---------------------------------------------
+
+### Start with some of these sales examples
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Active deals health check agent
+
+Sends a weekly HubSpot deal health update, ranks deals and enables the sales team.
+
+[Try it](/template/active-deal-health-check-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Closed-lost deal review agent
+
+Review all deals marked as "Closed lost" in Hubspot and send summary to the team.
+
+[Try it](/template/closed-lost-deal-review-agent)
+
+Dynamic template box for Legal, Use {{legal}}
+---------------------------------------------
+
+### Start with some of these legal examples
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+AI legal research agent
+
+Comprehensive legal research memo based on research question, jurisdiction and date range.
+
+[Try it](/template/ai-legal-research-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Compliance review agent
+
+Checks DPAs and privacy policies against your compliance checklist then scores coverage and make a plan.
+
+[Try it](/template/compliance-review-agent)
+
+Dynamic template box for Supply Chain/Logistics, Use {{supply}}
+---------------------------------------------------------------
+
+### Start with some of these supply chain examples
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Risk assessment agent for supply chain operations
+
+Comprehensive risk assessment for suppliers based on various data inputs.
+
+[Try it](/template/risk-assessment-agent-for-supply-chain-operations)
+
+Dynamic template box for Edtech, Use {{edtech}}
+-----------------------------------------------
+
+### Start with some of these edtech examples
+
+No items found.
+
+Dynamic template box for Compliance, Use {{compliance}}
+-------------------------------------------------------
+
+### Start with some of these compliance examples
+
+No items found.
+
+Dynamic template box for Customer Support, Use {{customer}}
+-----------------------------------------------------------
+
+### Start with some of these customer support examples
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68a469d876688065106f8384_Square%20Icon%20Illustration%20Colored%20(1).svg)
+
+Customer support agent
+
+[Try it](/template/customer-support-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68a469d876688065106f8384_Square%20Icon%20Illustration%20Colored%20(1).svg)
+
+Renewal tracker agent
+
+Create an agent that scans HubSpot for deals with upcoming renewal dates in the next 60 days.
+
+[Try it](/template/renewal-tracker-agent)
+
+Template box, 2 random templates, Use {{templates}}
+---------------------------------------------------
+
+### Start with some of these agents
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Research agent for sales demos
+
+Company research based on Linkedin and public data as a prep for sales demo.
+
+[Try it](/template/research-agent-for-sales-demos)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68a469a97181a5969cb61ac5_Square%20Icon%20Illustration%20Colored.svg)
+
+KYC compliance agent
+
+Automates KYC checks by reviewing customer documents stored in HubSpot
+
+[Try it](/template/kyc-automation-and-compliance-agent)
+
+Template box, 6 random templates, Use {{templates-plus}}
+--------------------------------------------------------
+
+### Build AI agents in minutes
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Review Comment Generator for GitHub PRs
+
+Use predefined guidelines to write a code review comment for a GitHub PR.
+
+[Try it](/template/github-pull-request-code-review-automation)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Legal RAG chatbot
+
+Chatbot that provides answers based on user queries and legal documents.
+
+[Try it](/template/legal-rag-chatbot)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68a469a97181a5969cb61ac5_Square%20Icon%20Illustration%20Colored.svg)
+
+Stripe transaction review agent
+
+Analyzes recent Stripe transactions for suspicious patterns, flags potential fraud, posts a summary in Slack.
+
+[Try it](/template/stripe-transaction-review-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/689e4f0f7b7754b28d5ebf70_Square%20Icon%20Illustration%20Colored.svg)
+
+Prior authorization navigator
+
+Automate the prior authorization process for medical claims.
+
+[Try it](/template/prior-authorization-navigator)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Active deals health check agent
+
+Sends a weekly HubSpot deal health update, ranks deals and enables the sales team.
+
+[Try it](/template/active-deal-health-check-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Agent that summarizes lengthy reports (PDF -> Summary)
+
+Summarize all kinds of PDFs into easily digestible summaries.
+
+[Try it](/template/pdf-document-summarization)
+
+Build AI agents in minutes for
+------------------------------
+
+{{industry\_name}}
+------------------
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68a469a97181a5969cb61ac5_Square%20Icon%20Illustration%20Colored.svg)
+
+Stripe transaction review agent
+
+Analyzes recent Stripe transactions for suspicious patterns, flags potential fraud, posts a summary in Slack.
+
+[Try it](/template/stripe-transaction-review-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68a469a97181a5969cb61ac5_Square%20Icon%20Illustration%20Colored.svg)
+
+KYC compliance agent
+
+Automates KYC checks by reviewing customer documents stored in HubSpot
+
+[Try it](/template/kyc-automation-and-compliance-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8679cd8af88/68a469a97181a5969cb61ac5_Square%20Icon%20Illustration%20Colored.svg)
+
+Client portfolio review agent
+
+Compiles weekly portfolio summaries from PDFs, highlights performance and risk, builds a Gamma presentation deck.
+
+[Try it](/template/client-portfolio-review-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Contract review agent
+
+Reviews contract text against a checklist, flags deviations, scores risk, and produces a lawyer friendly summary.
+
+[Try it](/template/contract-review-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+NDA deviation review agent
+
+Reviews NDAs against your standard template, highlights differences, and sends a risk rated summary to Slack.
+
+[Try it](/template/nda-deviation-review-agent)
+
+![](https://cdn.prod.website-files.com/63f416b32254e8eca5d8af54/688c049c3a420f848c97e6ce_vellum-mascot.png)
+
+Compliance review agent
+
+Checks DPAs and privacy policies against your compliance checklist then scores coverage and make a plan.
+
+[Try it](/template/compliance-review-agent)
+
+Case study results overview (usually added at top of case study)
+----------------------------------------------------------------
+
+What we did:
+
+1-click
+=======
+
+This is some text inside of a div block.
+
+28,000+
+=======
+
+Separate vector databases managed per tenant.
+
+100+
+====
+
+Real-world eval tests run before every release.
+
+---

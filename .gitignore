@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.python-version
+
+# Secret Environment
+.env
+
+# Cache
+*_cache/
+*_api/
+
+# AI
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+QWEN.md
+.serena/

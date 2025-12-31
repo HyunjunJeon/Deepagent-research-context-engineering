@@ -1,0 +1,62 @@
+[project]
+name = "deepagent-base-research-context-engineering"
+version = "0.1.0"
+description = "Base Research Context Engineering for DeepAgents"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.13"
+authors = [
+    { name = "Hyunjun Jeon", email = "jeonhj920@gmail.com" },
+]
+dependencies = [
+    "arxiv>=2.3.1",
+    "deepagents>=0.3.1",
+    "langchain-openai>=1.1.6",
+    "markdownify>=1.2.2",
+    "python-dotenv>=1.2.1",
+    "pytz>=2025.2",
+    "rich>=14.2.0",
+    "tavily-python>=0.7.17",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "ipywidgets>=8.1.8",
+    "langgraph-cli[inmem]>=0.4.11",
+    "mypy>=1.19.1",
+    "ruff>=0.14.10",
+]
+
+[build-system]
+requires = ["setuptools>=73.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["research_agent"]
+
+[tool.setuptools.package-data]
+"*" = ["py.typed"]
+
+[tool.ruff]
+lint.select = [
+    "E",    # pycodestyle
+    "F",    # pyflakes
+    "I",    # isort
+    "D",    # pydocstyle
+    "D401", # First line should be in imperative mood
+    "T201",
+    "UP",
+]
+lint.ignore = ["UP006", "UP007", "UP035", "D417", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "UP"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.13"
+exclude = [".venv"]
+ignore_missing_imports = true

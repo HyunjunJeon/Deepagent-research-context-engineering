@@ -1,0 +1,57 @@
+[project]
+name = "deepagents-harbor"
+version = "0.0.1"
+description = "Harbor integration with LangChain DeepAgents and LangSmith tracing"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # Harbor runtime
+    "harbor>=0.1.12",
+    "langchain-anthropic>=1.0.0",
+    "langchain-openai>=1.0.0",
+    "deepagents>=0.2.5",
+    # LangSmith for observability
+    "langsmith>=0.4.0",
+    "modal>=0.64.0",
+    "deepagents-cli",
+]
+
+[dependency-groups]
+test = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "ruff>=0.8.0",
+    "python-dotenv>=1.0.0",
+    "pytest-socket>=0.7.0",
+    "pytest-cov>=7.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["deepagents_harbor*"]
+
+[tool.uv]
+override-dependencies = [
+    "openai>=1.109.1,<2.0.0",
+    "e2b==2.4.3",
+]
+
+[tool.uv.sources]
+deepagents = { path = "../deepagents" }
+deepagents-cli = { path = "../deepagents-cli" }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
