@@ -30,6 +30,7 @@ futures = "0.3"  # Added: needed for LLMProvider streaming support
 num_cpus = "1"  # For default parallelism configuration
 humantime-serde = "1"  # For Duration serialization in configs
 zstd = "0.13"  # For checkpoint compression
+regex = "1"
 
 [dev-dependencies]
 # OpenAI support is built into rig-core
