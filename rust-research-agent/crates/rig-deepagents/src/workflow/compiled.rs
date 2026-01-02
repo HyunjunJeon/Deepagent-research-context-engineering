@@ -43,10 +43,14 @@ use crate::pregel::vertex::{
     BoxedVertex, ComputeContext, ComputeResult, StateUpdate, Vertex, VertexId,
 };
 use crate::pregel::PregelConfig;
-use crate::middleware::ToolDefinition;
+use crate::backends::Backend;
+use crate::middleware::{ToolDefinition, ToolRegistry};
+use crate::middleware::subagent::{SubAgentExecutorFactory, SubAgentRegistry};
 use crate::workflow::graph::{BuiltWorkflowGraph, END};
 use crate::workflow::node::NodeKind;
-use crate::workflow::vertices::{AgentVertex, FanInVertex, FanOutVertex, RouterVertex};
+use crate::workflow::vertices::{
+    AgentVertex, FanInVertex, FanOutVertex, RouterVertex, SubAgentVertex,
+};
 
 /// Errors that can occur during workflow compilation
 #[derive(Debug, Error)]
@@ -115,6 +119,9 @@ impl<S: WorkflowState + Serialize> CompiledWorkflow<S> {
     /// - Router nodes with LLMDecision strategy
     /// - Tool definitions for agent nodes
     ///
+    /// Note: This method passes tool definitions only. For full tool execution
+    /// support, use `compile_with_registry` instead.
+    ///
     /// # Example
     ///
     /// ```ignore
@@ -134,12 +141,120 @@ impl<S: WorkflowState + Serialize> CompiledWorkflow<S> {
         llm: Option<Arc<dyn LLMProvider>>,
         tools: Vec<ToolDefinition>,
     ) -> Result<Self, WorkflowCompileError> {
+        // Convert to registry-based compilation with empty registry
+        // (tools are passed as definitions only, no execution)
+        let registry = ToolRegistry::new();
+        // The registry is empty, so tools won't execute - but definitions are passed
+        Self::compile_internal(graph, config, llm, registry, tools, None, None, None)
+    }
+
+    /// Compile a workflow graph with LLM provider and tool registry
+    ///
+    /// This is the recommended compilation method for production use.
+    /// It enables full tool execution through the registry.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use rig_deepagents::middleware::{ToolRegistry, DynTool};
+    /// use rig_deepagents::tools::{TavilySearchTool, ThinkTool};
+    ///
+    /// let llm = Arc::new(OpenAIProvider::from_env()?);
+    ///
+    /// let mut registry = ToolRegistry::new();
+    /// registry.register(Arc::new(TavilySearchTool::from_env()?));
+    /// registry.register(Arc::new(ThinkTool));
+    ///
+    /// let workflow = CompiledWorkflow::compile_with_registry(
+    ///     graph,
+    ///     PregelConfig::default(),
+    ///     Some(llm),
+    ///     registry,
+    /// )?;
+    /// ```
+    pub fn compile_with_registry(
+        graph: BuiltWorkflowGraph<S>,
+        config: PregelConfig,
+        llm: Option<Arc<dyn LLMProvider>>,
+        registry: ToolRegistry,
+    ) -> Result<Self, WorkflowCompileError> {
+        let definitions = registry.definitions();
+        Self::compile_internal(graph, config, llm, registry, definitions, None, None, None)
+    }
+
+    /// Compile a workflow graph with all resources
+    ///
+    /// This is the most complete compilation method, enabling:
+    /// - Agent nodes with LLM and tool execution
+    /// - Router nodes with LLM decision making
+    /// - SubAgent nodes with registry and executor
+    /// - Tool nodes (if tool registry provided)
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use rig_deepagents::middleware::{ToolRegistry, SubAgentRegistry};
+    /// use rig_deepagents::middleware::subagent::DefaultSubAgentExecutorFactory;
+    ///
+    /// let workflow = CompiledWorkflow::compile_with_all(
+    ///     graph,
+    ///     PregelConfig::default(),
+    ///     Some(llm),
+    ///     tool_registry,
+    ///     Some(subagent_registry),
+    ///     Some(Arc::new(DefaultSubAgentExecutorFactory::new(llm.clone()))),
+    ///     Some(backend),
+    /// )?;
+    /// ```
+    pub fn compile_with_all(
+        graph: BuiltWorkflowGraph<S>,
+        config: PregelConfig,
+        llm: Option<Arc<dyn LLMProvider>>,
+        tool_registry: ToolRegistry,
+        subagent_registry: Option<Arc<SubAgentRegistry>>,
+        executor_factory: Option<Arc<dyn SubAgentExecutorFactory>>,
+        backend: Option<Arc<dyn Backend>>,
+    ) -> Result<Self, WorkflowCompileError> {
+        let definitions = tool_registry.definitions();
+        Self::compile_internal(
+            graph,
+            config,
+            llm,
+            tool_registry,
+            definitions,
+            subagent_registry,
+            executor_factory,
+            backend,
+        )
+    }
+
+    /// Internal compilation with all resources
+    #[allow(clippy::too_many_arguments)]
+    fn compile_internal(
+        graph: BuiltWorkflowGraph<S>,
+        config: PregelConfig,
+        llm: Option<Arc<dyn LLMProvider>>,
+        tool_registry: ToolRegistry,
+        tool_definitions: Vec<ToolDefinition>,
+        subagent_registry: Option<Arc<SubAgentRegistry>>,
+        executor_factory: Option<Arc<dyn SubAgentExecutorFactory>>,
+        backend: Option<Arc<dyn Backend>>,
+    ) -> Result<Self, WorkflowCompileError> {
         let mut runtime = PregelRuntime::with_config(config);
         let mut node_kinds = HashMap::new();
 
         // Create vertices from NodeKind
         for (node_id, kind) in &graph.nodes {
-            let vertex = Self::create_vertex(node_id, kind.clone(), llm.clone(), &tools)?;
+            let vertex = Self::create_vertex(
+                node_id,
+                kind.clone(),
+                llm.clone(),
+                &tool_registry,
+                &tool_definitions,
+                subagent_registry.as_ref(),
+                executor_factory.as_ref(),
+                backend.as_ref(),
+            )?;
             runtime.add_vertex(vertex);
             node_kinds.insert(VertexId::new(node_id), kind.clone());
         }
@@ -164,22 +279,39 @@ impl<S: WorkflowState + Serialize> CompiledWorkflow<S> {
     }
 
     /// Create a vertex from a NodeKind
+    #[allow(clippy::too_many_arguments)]
     fn create_vertex(
         node_id: &str,
         kind: NodeKind,
         llm: Option<Arc<dyn LLMProvider>>,
-        tools: &[ToolDefinition],
+        tool_registry: &ToolRegistry,
+        tool_definitions: &[ToolDefinition],
+        subagent_registry: Option<&Arc<SubAgentRegistry>>,
+        executor_factory: Option<&Arc<dyn SubAgentExecutorFactory>>,
+        backend: Option<&Arc<dyn Backend>>,
     ) -> Result<BoxedVertex<S, WorkflowMessage>, WorkflowCompileError> {
         match kind {
             NodeKind::Agent(config) => {
                 // Use real AgentVertex if LLM is available, otherwise passthrough
                 match llm {
-                    Some(llm_provider) => Ok(Arc::new(AgentVertex::<S>::new(
-                        node_id,
-                        config,
-                        llm_provider,
-                        tools.to_vec(),
-                    ))),
+                    Some(llm_provider) => {
+                        // Use registry if it has tools, otherwise fall back to definitions
+                        if tool_registry.is_empty() {
+                            Ok(Arc::new(AgentVertex::<S>::new(
+                                node_id,
+                                config,
+                                llm_provider,
+                                tool_definitions.to_vec(),
+                            )))
+                        } else {
+                            Ok(Arc::new(AgentVertex::<S>::new_with_registry(
+                                node_id,
+                                config,
+                                llm_provider,
+                                tool_registry.clone(),
+                            )))
+                        }
+                    }
                     None => {
                         tracing::warn!(
                             node_id = node_id,
@@ -190,7 +322,7 @@ impl<S: WorkflowState + Serialize> CompiledWorkflow<S> {
                 }
             }
             NodeKind::Tool(_config) => {
-                // TODO: ToolVertex requires tool registry
+                // TODO: ToolVertex requires ToolRuntime and registered tool
                 // For now, use PassthroughVertex as placeholder
                 Ok(Arc::new(PassthroughVertex::new(node_id)))
             }
@@ -198,10 +330,26 @@ impl<S: WorkflowState + Serialize> CompiledWorkflow<S> {
                 // RouterVertex can work with or without LLM (for StateField strategy)
                 Ok(Arc::new(RouterVertex::<S>::new(node_id, config, llm)))
             }
-            NodeKind::SubAgent(_config) => {
-                // TODO: SubAgentVertex requires sub-agent registry
-                // For now, use PassthroughVertex as placeholder
-                Ok(Arc::new(PassthroughVertex::new(node_id)))
+            NodeKind::SubAgent(config) => {
+                // Create SubAgentVertex if all required resources are available
+                match (subagent_registry, executor_factory, backend) {
+                    (Some(registry), Some(factory), Some(backend)) => {
+                        Ok(Arc::new(SubAgentVertex::<S>::new(
+                            node_id,
+                            config,
+                            registry.clone(),
+                            factory.clone(),
+                            backend.clone(),
+                        )))
+                    }
+                    _ => {
+                        tracing::warn!(
+                            node_id = node_id,
+                            "SubAgent node requires registry, executor factory, and backend - using passthrough"
+                        );
+                        Ok(Arc::new(PassthroughVertex::new(node_id)))
+                    }
+                }
             }
             NodeKind::FanOut(config) => Ok(Arc::new(FanOutVertex::<S>::new(node_id, config))),
             NodeKind::FanIn(config) => Ok(Arc::new(FanInVertex::<S>::new(node_id, config))),

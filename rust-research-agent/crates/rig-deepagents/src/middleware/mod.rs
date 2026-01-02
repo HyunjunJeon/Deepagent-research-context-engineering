@@ -24,7 +24,7 @@ pub mod subagent;
 // pub mod skills;
 
 // Core traits and types
-pub use traits::{AgentMiddleware, DynTool, Tool, ToolDefinition, StateUpdate};
+pub use traits::{AgentMiddleware, DynTool, Tool, ToolDefinition, ToolRegistry, StateUpdate};
 pub use stack::MiddlewareStack;
 
 // SubAgent types

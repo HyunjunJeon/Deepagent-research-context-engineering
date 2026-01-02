@@ -63,32 +63,74 @@ impl<S: WorkflowState> ToolVertex<S> {
     }
 
     /// Build arguments by merging static args with state-resolved args
-    fn build_arguments(&self, _state: &S) -> serde_json::Value {
-        let args = self.config.static_args.clone();
+    ///
+    /// Priority: state-resolved args override static args with the same key
+    fn build_arguments(&self, state: &S) -> serde_json::Value
+    where
+        S: serde::Serialize,
+    {
+        let mut args: serde_json::Map<String, serde_json::Value> =
+            self.config.static_args.clone().into_iter().collect();
 
-        // TODO: Resolve state_arg_paths from workflow state
-        // For now, we only use static args
-        // In a full implementation, we would:
-        // 1. Parse each state_arg_path (e.g., "research.query")
-        // 2. Extract the value from the workflow state
-        // 3. Merge it into args
-
-        for arg_name in self.config.state_arg_paths.keys() {
-            // Placeholder: in a real implementation, resolve state_path from state
-            // For now, skip dynamic args
-            tracing::debug!(
-                vertex_id = %self.id,
-                arg_name = %arg_name,
-                "Skipping state arg (not yet implemented)"
-            );
+        // Serialize state once for field extraction
+        if !self.config.state_arg_paths.is_empty() {
+            if let Ok(state_json) = serde_json::to_value(state) {
+                // Resolve each state arg path
+                for (arg_name, state_path) in &self.config.state_arg_paths {
+                    if let Some(value) = self.get_state_field(&state_json, state_path) {
+                        tracing::debug!(
+                            vertex_id = %self.id,
+                            arg_name = %arg_name,
+                            state_path = %state_path,
+                            "Resolved state arg"
+                        );
+                        args.insert(arg_name.clone(), value);
+                    } else {
+                        tracing::warn!(
+                            vertex_id = %self.id,
+                            arg_name = %arg_name,
+                            state_path = %state_path,
+                            "Failed to resolve state arg - path not found"
+                        );
+                    }
+                }
+            } else {
+                tracing::warn!(
+                    vertex_id = %self.id,
+                    "Failed to serialize state for arg resolution"
+                );
+            }
         }
 
-        serde_json::Value::Object(args.into_iter().collect())
+        serde_json::Value::Object(args)
+    }
+
+    /// Get a field value from serialized state using dot notation
+    ///
+    /// Supports nested paths like "query" or "research.status"
+    fn get_state_field(
+        &self,
+        state: &serde_json::Value,
+        field_path: &str,
+    ) -> Option<serde_json::Value> {
+        let parts: Vec<&str> = field_path.split('.').collect();
+        let mut current = state;
+
+        for part in parts {
+            match current {
+                serde_json::Value::Object(map) => {
+                    current = map.get(part)?;
+                }
+                _ => return None,
+            }
+        }
+
+        Some(current.clone())
     }
 }
 
 #[async_trait]
-impl<S: WorkflowState> Vertex<S, WorkflowMessage> for ToolVertex<S> {
+impl<S: WorkflowState + serde::Serialize> Vertex<S, WorkflowMessage> for ToolVertex<S> {
     fn id(&self) -> &VertexId {
         &self.id
     }
@@ -318,5 +360,147 @@ mod tests {
             }
             _ => panic!("Expected Data message"),
         }
+    }
+
+    // Custom state type for testing state arg resolution
+    #[derive(Clone, serde::Serialize, serde::Deserialize)]
+    struct TestState {
+        query: String,
+        settings: TestSettings,
+    }
+
+    #[derive(Clone, serde::Serialize, serde::Deserialize)]
+    struct TestSettings {
+        max_results: i32,
+        depth: String,
+    }
+
+    impl crate::pregel::state::WorkflowState for TestState {
+        type Update = ();
+
+        fn apply_update(&self, _update: Self::Update) -> Self {
+            self.clone()
+        }
+
+        fn merge_updates(_updates: Vec<Self::Update>) -> Self::Update {}
+    }
+
+    impl crate::pregel::vertex::StateUpdate for () {
+        fn empty() -> Self {}
+
+        fn is_empty(&self) -> bool {
+            true
+        }
+    }
+
+    #[test]
+    fn test_tool_vertex_state_arg_resolution() {
+        let mock_tool: DynTool = Arc::new(MockTool::new("search", serde_json::json!({})));
+        let runtime = create_test_runtime();
+
+        // Configure static args and state arg paths
+        let mut static_args = HashMap::new();
+        static_args.insert("api_key".to_string(), serde_json::json!("secret123"));
+
+        let mut state_arg_paths = HashMap::new();
+        state_arg_paths.insert("query".to_string(), "query".to_string());
+        state_arg_paths.insert("limit".to_string(), "settings.max_results".to_string());
+        state_arg_paths.insert("search_depth".to_string(), "settings.depth".to_string());
+
+        let config = ToolNodeConfig {
+            tool_name: "search".to_string(),
+            static_args,
+            state_arg_paths,
+            ..Default::default()
+        };
+
+        let vertex: ToolVertex<TestState> = ToolVertex::new("test", config, mock_tool, runtime);
+
+        // Create test state
+        let state = TestState {
+            query: "rust programming".to_string(),
+            settings: TestSettings {
+                max_results: 10,
+                depth: "advanced".to_string(),
+            },
+        };
+
+        let args = vertex.build_arguments(&state);
+        let args_obj = args.as_object().unwrap();
+
+        // Static arg should be present
+        assert_eq!(args_obj.get("api_key"), Some(&serde_json::json!("secret123")));
+
+        // State args should be resolved
+        assert_eq!(args_obj.get("query"), Some(&serde_json::json!("rust programming")));
+        assert_eq!(args_obj.get("limit"), Some(&serde_json::json!(10)));
+        assert_eq!(args_obj.get("search_depth"), Some(&serde_json::json!("advanced")));
+    }
+
+    #[test]
+    fn test_tool_vertex_state_arg_override_static() {
+        let mock_tool: DynTool = Arc::new(MockTool::new("tool", serde_json::json!({})));
+        let runtime = create_test_runtime();
+
+        // Both static and state args have "query" key
+        let mut static_args = HashMap::new();
+        static_args.insert("query".to_string(), serde_json::json!("static query"));
+
+        let mut state_arg_paths = HashMap::new();
+        state_arg_paths.insert("query".to_string(), "query".to_string()); // Override!
+
+        let config = ToolNodeConfig {
+            tool_name: "tool".to_string(),
+            static_args,
+            state_arg_paths,
+            ..Default::default()
+        };
+
+        let vertex: ToolVertex<TestState> = ToolVertex::new("test", config, mock_tool, runtime);
+
+        let state = TestState {
+            query: "dynamic query".to_string(),
+            settings: TestSettings {
+                max_results: 5,
+                depth: "basic".to_string(),
+            },
+        };
+
+        let args = vertex.build_arguments(&state);
+        let args_obj = args.as_object().unwrap();
+
+        // State arg should override static arg
+        assert_eq!(args_obj.get("query"), Some(&serde_json::json!("dynamic query")));
+    }
+
+    #[test]
+    fn test_tool_vertex_missing_state_path() {
+        let mock_tool: DynTool = Arc::new(MockTool::new("tool", serde_json::json!({})));
+        let runtime = create_test_runtime();
+
+        let mut state_arg_paths = HashMap::new();
+        state_arg_paths.insert("missing".to_string(), "nonexistent.path".to_string());
+
+        let config = ToolNodeConfig {
+            tool_name: "tool".to_string(),
+            state_arg_paths,
+            ..Default::default()
+        };
+
+        let vertex: ToolVertex<TestState> = ToolVertex::new("test", config, mock_tool, runtime);
+
+        let state = TestState {
+            query: "test".to_string(),
+            settings: TestSettings {
+                max_results: 5,
+                depth: "basic".to_string(),
+            },
+        };
+
+        let args = vertex.build_arguments(&state);
+        let args_obj = args.as_object().unwrap();
+
+        // Missing path should not be included
+        assert!(!args_obj.contains_key("missing"));
     }
 }

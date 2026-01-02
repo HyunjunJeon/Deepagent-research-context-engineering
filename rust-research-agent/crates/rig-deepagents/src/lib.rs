@@ -42,7 +42,7 @@ pub mod config;
 pub use error::{BackendError, MiddlewareError, DeepAgentError, WriteResult, EditResult};
 pub use state::{AgentState, Message, Role, Todo, TodoStatus, FileData, ToolCall};
 pub use backends::{Backend, FileInfo, GrepMatch, MemoryBackend, FilesystemBackend, CompositeBackend};
-pub use middleware::{AgentMiddleware, MiddlewareStack, StateUpdate, Tool, ToolDefinition, DynTool};
+pub use middleware::{AgentMiddleware, MiddlewareStack, StateUpdate, Tool, ToolDefinition, ToolRegistry, DynTool};
 pub use runtime::{ToolRuntime, RuntimeConfig};
 pub use tools::{
     ReadFileTool, WriteFileTool, EditFileTool,

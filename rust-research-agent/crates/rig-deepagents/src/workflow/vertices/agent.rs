@@ -2,17 +2,25 @@
 //!
 //! Implements the Vertex trait for agent nodes that use LLMs to process
 //! messages and can iteratively call tools until a stop condition is met.
+//!
+//! # Tool Execution
+//!
+//! Tools are executed through a `ToolRegistry` that maps tool names to
+//! implementations. The vertex creates a minimal `ToolRuntime` for each
+//! tool execution with the tool_call_id set for tracing.
 
 use async_trait::async_trait;
 use std::sync::Arc;
 
+use crate::backends::MemoryBackend;
 use crate::llm::{LLMConfig, LLMProvider};
-use crate::middleware::ToolDefinition;
+use crate::middleware::{ToolDefinition, ToolRegistry};
 use crate::pregel::error::PregelError;
 use crate::pregel::message::WorkflowMessage;
 use crate::pregel::state::WorkflowState;
 use crate::pregel::vertex::{ComputeContext, ComputeResult, StateUpdate, Vertex, VertexId};
-use crate::state::{Message, Role};
+use crate::runtime::ToolRuntime;
+use crate::state::{AgentState, Message, Role};
 use crate::workflow::node::{AgentNodeConfig, StopCondition};
 
 /// An agent vertex that uses an LLM to process messages and call tools
@@ -20,12 +28,40 @@ pub struct AgentVertex<S: WorkflowState> {
     id: VertexId,
     config: AgentNodeConfig,
     llm: Arc<dyn LLMProvider>,
-    tools: Vec<ToolDefinition>,
+    /// Tool registry for looking up and executing tools
+    tool_registry: ToolRegistry,
+    /// Tool definitions for LLM (cached from registry)
+    tool_definitions: Vec<ToolDefinition>,
     _phantom: std::marker::PhantomData<S>,
 }
 
 impl<S: WorkflowState> AgentVertex<S> {
-    /// Create a new agent vertex
+    /// Create a new agent vertex with tool registry
+    ///
+    /// The registry provides both tool definitions (for LLM) and
+    /// implementations (for execution).
+    pub fn new_with_registry(
+        id: impl Into<VertexId>,
+        config: AgentNodeConfig,
+        llm: Arc<dyn LLMProvider>,
+        registry: ToolRegistry,
+    ) -> Self {
+        let tool_definitions = registry.definitions();
+        Self {
+            id: id.into(),
+            config,
+            llm,
+            tool_registry: registry,
+            tool_definitions,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Create a new agent vertex with tool definitions only (no execution)
+    ///
+    /// This constructor is for backwards compatibility. Tools will not
+    /// be executed - only their definitions are passed to the LLM.
+    /// Use `new_with_registry` for full tool execution support.
     pub fn new(
         id: impl Into<VertexId>,
         config: AgentNodeConfig,
@@ -36,17 +72,64 @@ impl<S: WorkflowState> AgentVertex<S> {
             id: id.into(),
             config,
             llm,
-            tools,
+            tool_registry: ToolRegistry::new(),
+            tool_definitions: tools,
             _phantom: std::marker::PhantomData,
         }
     }
 
+    /// Create a minimal ToolRuntime for tool execution
+    fn create_tool_runtime(&self, tool_call_id: &str) -> ToolRuntime {
+        let backend = Arc::new(MemoryBackend::new());
+        let state = AgentState::new();
+        ToolRuntime::new(state, backend).with_tool_call_id(tool_call_id)
+    }
+
+    /// Execute a tool and return the result
+    async fn execute_tool(
+        &self,
+        tool_name: &str,
+        args: serde_json::Value,
+        tool_call_id: &str,
+    ) -> Result<String, PregelError> {
+        if let Some(tool) = self.tool_registry.get(tool_name) {
+            let runtime = self.create_tool_runtime(tool_call_id);
+            tool.execute(args, &runtime)
+                .await
+                .map_err(|e| PregelError::VertexError {
+                    vertex_id: self.id.clone(),
+                    message: format!("Tool '{}' execution failed: {}", tool_name, e),
+                    source: None,
+                })
+        } else {
+            // Tool not in registry - return error message as result
+            // This allows the LLM to recover and try a different approach
+            Ok(format!(
+                "Error: Tool '{}' is not available. Available tools: {:?}",
+                tool_name,
+                self.tool_registry.names()
+            ))
+        }
+    }
+
     /// Check if any stop condition is met
-    fn check_stop_conditions(&self, message: &Message, iteration: usize) -> bool {
+    ///
+    /// # Arguments
+    /// * `message` - The latest assistant message
+    /// * `iteration` - Current iteration count
+    /// * `state_json` - Serialized workflow state for StateMatch conditions
+    fn check_stop_conditions(
+        &self,
+        message: &Message,
+        iteration: usize,
+        state_json: Option<&serde_json::Value>,
+    ) -> bool {
         for condition in &self.config.stop_conditions {
             match condition {
                 StopCondition::NoToolCalls => {
-                    if message.tool_calls.is_none() || message.tool_calls.as_ref().unwrap().is_empty() {
+                    if message.tool_calls.is_none()
+                        || message.tool_calls.as_ref().unwrap().is_empty()
+                    {
                         return true;
                     }
                 }
@@ -67,25 +150,59 @@ impl<S: WorkflowState> AgentVertex<S> {
                         return true;
                     }
                 }
-                StopCondition::StateMatch { .. } => {
-                    // TODO: Implement state matching
-                    continue;
+                StopCondition::StateMatch { field, value } => {
+                    // Check if state field matches the expected value
+                    if let Some(state) = state_json {
+                        if let Some(field_value) = self.get_state_field(state, field) {
+                            if &field_value == value {
+                                tracing::debug!(
+                                    vertex_id = %self.id,
+                                    field = %field,
+                                    "StateMatch condition met"
+                                );
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
         }
         false
     }
 
+    /// Get a field value from serialized state using dot notation
+    ///
+    /// Supports nested paths like "phase" or "research.status"
+    fn get_state_field(
+        &self,
+        state: &serde_json::Value,
+        field_path: &str,
+    ) -> Option<serde_json::Value> {
+        let parts: Vec<&str> = field_path.split('.').collect();
+        let mut current = state;
+
+        for part in parts {
+            match current {
+                serde_json::Value::Object(map) => {
+                    current = map.get(part)?;
+                }
+                _ => return None,
+            }
+        }
+
+        Some(current.clone())
+    }
+
     /// Filter tools based on allowed list
     fn filter_tools(&self) -> Vec<ToolDefinition> {
         if let Some(allowed) = &self.config.allowed_tools {
-            self.tools
+            self.tool_definitions
                 .iter()
                 .filter(|t| allowed.contains(&t.name))
                 .cloned()
                 .collect()
         } else {
-            self.tools.clone()
+            self.tool_definitions.clone()
         }
     }
 
@@ -96,7 +213,7 @@ impl<S: WorkflowState> AgentVertex<S> {
 }
 
 #[async_trait]
-impl<S: WorkflowState> Vertex<S, WorkflowMessage> for AgentVertex<S> {
+impl<S: WorkflowState + serde::Serialize> Vertex<S, WorkflowMessage> for AgentVertex<S> {
     fn id(&self) -> &VertexId {
         &self.id
     }
@@ -138,6 +255,9 @@ impl<S: WorkflowState> Vertex<S, WorkflowMessage> for AgentVertex<S> {
         let filtered_tools = self.filter_tools();
         let llm_config = self.build_llm_config();
 
+        // Serialize state for StateMatch conditions (once, outside the loop)
+        let state_json = serde_json::to_value(ctx.state).ok();
+
         // Agent loop: iterate until stop condition or max iterations
         for iteration in 0..self.config.max_iterations {
             // Call LLM
@@ -154,8 +274,8 @@ impl<S: WorkflowState> Vertex<S, WorkflowMessage> for AgentVertex<S> {
             let assistant_message = response.message.clone();
             messages.push(assistant_message.clone());
 
-            // Check stop conditions
-            if self.check_stop_conditions(&assistant_message, iteration) {
+            // Check stop conditions (with state for StateMatch)
+            if self.check_stop_conditions(&assistant_message, iteration, state_json.as_ref()) {
                 // Send final response as output message
                 ctx.send_message(
                     "output",
@@ -170,12 +290,20 @@ impl<S: WorkflowState> Vertex<S, WorkflowMessage> for AgentVertex<S> {
             // If there are tool calls, execute them
             if let Some(tool_calls) = &assistant_message.tool_calls {
                 for tool_call in tool_calls {
-                    // TODO: Execute tool calls
-                    // For now, just add a mock tool result
-                    messages.push(Message::tool(
-                        "Tool executed successfully",
-                        &tool_call.id,
-                    ));
+                    // Execute the tool and get the result
+                    let result = self
+                        .execute_tool(&tool_call.name, tool_call.arguments.clone(), &tool_call.id)
+                        .await?;
+
+                    // Add tool result message to conversation
+                    messages.push(Message::tool(&result, &tool_call.id));
+
+                    tracing::debug!(
+                        vertex_id = %self.id,
+                        tool = %tool_call.name,
+                        result_len = result.len(),
+                        "Tool executed successfully"
+                    );
                 }
             } else {
                 // No tool calls and no stop condition matched, halt anyway
@@ -350,5 +478,102 @@ mod tests {
 
         // Should hit max iterations and return error
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_state_field_simple() {
+        let vertex = AgentVertex::<UnitState>::new(
+            "test",
+            AgentNodeConfig::default(),
+            Arc::new(MockLLMProvider::new()),
+            vec![],
+        );
+
+        let state = serde_json::json!({
+            "phase": "Exploratory",
+            "can_continue": true,
+            "search_count": 3
+        });
+
+        // Test simple field access
+        assert_eq!(
+            vertex.get_state_field(&state, "phase"),
+            Some(serde_json::json!("Exploratory"))
+        );
+        assert_eq!(
+            vertex.get_state_field(&state, "can_continue"),
+            Some(serde_json::json!(true))
+        );
+        assert_eq!(
+            vertex.get_state_field(&state, "search_count"),
+            Some(serde_json::json!(3))
+        );
+
+        // Test missing field
+        assert_eq!(vertex.get_state_field(&state, "missing"), None);
+    }
+
+    #[test]
+    fn test_get_state_field_nested() {
+        let vertex = AgentVertex::<UnitState>::new(
+            "test",
+            AgentNodeConfig::default(),
+            Arc::new(MockLLMProvider::new()),
+            vec![],
+        );
+
+        let state = serde_json::json!({
+            "research": {
+                "status": "active",
+                "depth": 2
+            }
+        });
+
+        // Test nested field access
+        assert_eq!(
+            vertex.get_state_field(&state, "research.status"),
+            Some(serde_json::json!("active"))
+        );
+        assert_eq!(
+            vertex.get_state_field(&state, "research.depth"),
+            Some(serde_json::json!(2))
+        );
+
+        // Test missing nested field
+        assert_eq!(vertex.get_state_field(&state, "research.missing"), None);
+    }
+
+    #[test]
+    fn test_check_stop_conditions_state_match() {
+        let vertex = AgentVertex::<UnitState>::new(
+            "test",
+            AgentNodeConfig {
+                stop_conditions: vec![StopCondition::StateMatch {
+                    field: "phase".to_string(),
+                    value: serde_json::json!("Complete"),
+                }],
+                ..Default::default()
+            },
+            Arc::new(MockLLMProvider::new()),
+            vec![],
+        );
+
+        let message = Message {
+            role: Role::Assistant,
+            content: "Done".to_string(),
+            tool_calls: Some(vec![]),
+            tool_call_id: None,
+        };
+
+        // State with non-matching phase
+        let state_exploratory = serde_json::json!({"phase": "Exploratory"});
+        assert!(!vertex.check_stop_conditions(&message, 0, Some(&state_exploratory)));
+
+        // State with matching phase
+        let state_complete = serde_json::json!({"phase": "Complete"});
+        assert!(vertex.check_stop_conditions(&message, 0, Some(&state_complete)));
+
+        // No state provided
+        assert!(!vertex.check_stop_conditions(&message, 0, None));
     }
 }

@@ -49,6 +49,88 @@ pub trait Tool: Send + Sync {
 /// 동적 도구 타입
 pub type DynTool = Arc<dyn Tool>;
 
+/// Tool registry for managing tool implementations
+///
+/// Maps tool names to their implementations for execution.
+///
+/// # Example
+///
+/// ```ignore
+/// use rig_deepagents::middleware::{ToolRegistry, DynTool};
+/// use rig_deepagents::tools::ThinkTool;
+/// use std::sync::Arc;
+///
+/// let mut registry = ToolRegistry::new();
+/// registry.register(Arc::new(ThinkTool));
+///
+/// // Look up and execute
+/// if let Some(tool) = registry.get("think") {
+///     let result = tool.execute(args, &runtime).await?;
+/// }
+/// ```
+#[derive(Default, Clone)]
+pub struct ToolRegistry {
+    tools: HashMap<String, DynTool>,
+}
+
+impl ToolRegistry {
+    /// Create an empty registry
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register a tool implementation
+    pub fn register(&mut self, tool: DynTool) {
+        let name = tool.definition().name;
+        self.tools.insert(name, tool);
+    }
+
+    /// Register multiple tools at once
+    pub fn register_all(&mut self, tools: Vec<DynTool>) {
+        for tool in tools {
+            self.register(tool);
+        }
+    }
+
+    /// Get a tool by name
+    pub fn get(&self, name: &str) -> Option<&DynTool> {
+        self.tools.get(name)
+    }
+
+    /// Get all tool definitions (schemas) for LLM
+    pub fn definitions(&self) -> Vec<ToolDefinition> {
+        self.tools.values().map(|t| t.definition()).collect()
+    }
+
+    /// Get all tool names
+    pub fn names(&self) -> Vec<&str> {
+        self.tools.keys().map(|s| s.as_str()).collect()
+    }
+
+    /// Check if a tool exists
+    pub fn contains(&self, name: &str) -> bool {
+        self.tools.contains_key(name)
+    }
+
+    /// Number of registered tools
+    pub fn len(&self) -> usize {
+        self.tools.len()
+    }
+
+    /// Check if registry is empty
+    pub fn is_empty(&self) -> bool {
+        self.tools.is_empty()
+    }
+}
+
+impl std::fmt::Debug for ToolRegistry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ToolRegistry")
+            .field("tools", &self.tools.keys().collect::<Vec<_>>())
+            .finish()
+    }
+}
+
 /// AgentMiddleware 트레이트
 ///
 /// Python Reference: AgentMiddleware(Generic[StateT, ContextT])
