@@ -1,18 +1,24 @@
-"""Approval widget for HITL - using standard Textual patterns."""
+"""HITL(승인)용 Approval 위젯입니다(Textual 표준 패턴 기반).
+
+Approval widget for HITL - using standard Textual patterns.
+"""
 
 from __future__ import annotations
 
-import asyncio
-from typing import Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
-from textual import events
-from textual.app import ComposeResult
 from textual.binding import Binding, BindingType
 from textual.containers import Container, Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Static
 
 from deepagents_cli.widgets.tool_renderers import get_renderer
+
+if TYPE_CHECKING:
+    import asyncio
+
+    from textual import events
+    from textual.app import ComposeResult
 
 
 class ApprovalMenu(Container):
@@ -50,6 +56,7 @@ class ApprovalMenu(Container):
         """Message sent when user makes a decision."""
 
         def __init__(self, decision: dict[str, str]) -> None:
+            """Create the message with the selected decision payload."""
             super().__init__()
             self.decision = decision
 
@@ -60,6 +67,7 @@ class ApprovalMenu(Container):
         id: str | None = None,  # noqa: A002
         **kwargs: Any,
     ) -> None:
+        """Create the approval menu widget for a single action request."""
         super().__init__(id=id or "approval-menu", classes="approval-menu", **kwargs)
         self._action_request = action_request
         self._assistant_id = assistant_id
@@ -90,7 +98,7 @@ class ApprovalMenu(Container):
         # Options container FIRST - always visible at top
         with Container(classes="approval-options-container"):
             # Options - create 3 Static widgets
-            for i in range(3):
+            for _ in range(3):
                 widget = Static("", classes="approval-option")
                 self._option_widgets.append(widget)
                 yield widget
@@ -138,7 +146,7 @@ class ApprovalMenu(Container):
         ]
 
         for i, (text, widget) in enumerate(zip(options, self._option_widgets, strict=True)):
-            cursor = "› " if i == self._selected else "  "
+            cursor = "> " if i == self._selected else "  "
             widget.update(f"{cursor}{text}")
 
             # Update classes
@@ -194,6 +202,6 @@ class ApprovalMenu(Container):
         # Post message
         self.post_message(self.Decided(decision))
 
-    def on_blur(self, event: events.Blur) -> None:
+    def on_blur(self, _event: events.Blur) -> None:
         """Re-focus on blur to keep focus trapped."""
         self.call_after_refresh(self.focus)

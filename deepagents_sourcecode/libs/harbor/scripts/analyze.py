@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Analyze job trials from a jobs directory.
+"""jobs 디렉토리의 trial 실행 결과를 분석합니다.
+
+Analyze job trials from a jobs directory.
 
 Scans through trial directories, extracts trajectory data and success metrics.
 """
@@ -783,7 +785,7 @@ async def main():
                     if output_file:
                         print(f"  ✓ Analysis written to: {output_file}")
                     else:
-                        print(f"  ✗ Skipped (no trajectory or already completed)")
+                        print("  ✗ Skipped (no trajectory or already completed)")
                 except Exception as e:
                     print(f"  ✗ Error: {e}")
 

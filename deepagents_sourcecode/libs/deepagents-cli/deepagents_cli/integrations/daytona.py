@@ -1,4 +1,7 @@
-"""Daytona sandbox backend implementation."""
+"""Daytona 샌드박스 백엔드 구현입니다.
+
+Daytona sandbox backend implementation.
+"""
 
 from __future__ import annotations
 
@@ -70,8 +73,9 @@ class DaytonaBackend(BaseSandbox):
             List of FileDownloadResponse objects, one per input path.
             Response order matches input order.
 
-        TODO: Map Daytona API error strings to standardized FileOperationError codes.
-        Currently only implements happy path.
+        Note: Daytona API 에러 문자열을 표준화된 FileOperationError 코드로 매핑하는 작업은
+        추후 보완합니다.
+        현재는 정상(happy path) 위주로만 구현되어 있습니다.
         """
         from daytona import FileDownloadRequest
 
@@ -80,12 +84,12 @@ class DaytonaBackend(BaseSandbox):
         daytona_responses = self._sandbox.fs.download_files(download_requests)
 
         # Convert Daytona results to our response format
-        # TODO: Map resp.error to standardized error codes when available
+        # NOTE: resp.error를 표준화된 error code로 매핑하는 작업은 추후 보완합니다.
         return [
             FileDownloadResponse(
                 path=resp.source,
                 content=resp.result,
-                error=None,  # TODO: map resp.error to FileOperationError
+                error=None,  # NOTE: resp.error -> FileOperationError 매핑은 추후 보완
             )
             for resp in daytona_responses
         ]
@@ -104,14 +108,18 @@ class DaytonaBackend(BaseSandbox):
             List of FileUploadResponse objects, one per input file.
             Response order matches input order.
 
-        TODO: Map Daytona API error strings to standardized FileOperationError codes.
-        Currently only implements happy path.
+        Note: Daytona API 에러 문자열을 표준화된 FileOperationError 코드로 매핑하는 작업은
+        추후 보완합니다.
+        현재는 정상(happy path) 위주로만 구현되어 있습니다.
         """
         from daytona import FileUpload
 
         # Create batch upload request using Daytona's native batch API
-        upload_requests = [FileUpload(source=content, destination=path) for path, content in files]
+        upload_requests = [
+            FileUpload(source=content, destination=path) for path, content in files
+        ]
         self._sandbox.fs.upload_files(upload_requests)
 
-        # TODO: Check if Daytona returns error info and map to FileOperationError codes
+        # NOTE: Daytona가 error 정보를 제공하는 경우, FileOperationError 코드로 매핑하는 작업은
+        # 추후 보완합니다.
         return [FileUploadResponse(path=path, error=None) for path, _ in files]

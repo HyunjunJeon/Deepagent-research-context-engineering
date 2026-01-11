@@ -1,4 +1,7 @@
-"""Main entry point and CLI loop for deepagents."""
+"""deepagents CLI의 메인 엔트리포인트 및 루프입니다.
+
+Main entry point and CLI loop for deepagents.
+"""
 # ruff: noqa: T201
 
 import argparse
@@ -227,8 +230,8 @@ async def run_textual_cli_async(
                 cwd=Path.cwd(),
                 thread_id=thread_id,
             )
-        except Exception as e:
-            console.print(f"[red]❌ Failed to create agent: {e}[/red]")
+        except Exception as err:  # noqa: BLE001
+            console.print(f"[red]❌ Failed to create agent: {err}[/red]")
             sys.exit(1)
         finally:
             # Clean up sandbox if we created one
@@ -237,7 +240,7 @@ async def run_textual_cli_async(
                     sandbox_cm.__exit__(None, None, None)
 
 
-def cli_main() -> None:
+def cli_main() -> None:  # noqa: PLR0912, PLR0915
     """Entry point for console script."""
     # Fix for gRPC fork issue on macOS
     # https://github.com/grpc/grpc/issues/37642

@@ -1,13 +1,20 @@
-"""Clipboard utilities for deepagents-cli."""
+"""deepagents-cli에서 클립보드 연동을 위한 유틸리티입니다.
+
+Clipboard utilities for deepagents-cli.
+"""
 
 from __future__ import annotations
 
 import base64
+import logging
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from textual.app import App
+
+logger = logging.getLogger(__name__)
 
 _PREVIEW_MAX_LENGTH = 40
 
@@ -19,7 +26,7 @@ def _copy_osc52(text: str) -> None:
     if os.environ.get("TMUX"):
         osc52_seq = f"\033Ptmux;\033{osc52_seq}\033\\"
 
-    with open("/dev/tty", "w") as tty:
+    with Path("/dev/tty").open("w") as tty:
         tty.write(osc52_seq)
         tty.flush()
 
@@ -48,7 +55,8 @@ def copy_selection_to_clipboard(app: App) -> None:
 
         try:
             result = widget.get_selection(selection)
-        except Exception:
+        except (AttributeError, ValueError, TypeError) as err:
+            logger.debug("Failed to read selection from widget.", exc_info=err)
             continue
 
         if not result:
@@ -77,14 +85,16 @@ def copy_selection_to_clipboard(app: App) -> None:
     for copy_fn in copy_methods:
         try:
             copy_fn(combined_text)
+        except (OSError, RuntimeError, ValueError) as err:
+            logger.debug("Clipboard copy method failed.", exc_info=err)
+            continue
+        else:
             app.notify(
                 f'"{_shorten_preview(selected_texts)}" copied',
                 severity="information",
                 timeout=2,
             )
             return
-        except Exception:
-            continue
 
     # If all methods fail, still notify but warn
     app.notify(

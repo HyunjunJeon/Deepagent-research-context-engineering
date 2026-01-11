@@ -1,11 +1,16 @@
-"""Input handling, completers, and prompt session for the CLI."""
+"""CLI 입력 처리(완성/프롬프트 세션 포함)를 담당합니다.
+
+Input handling, completers, and prompt session for the CLI.
+"""
+
+from __future__ import annotations
 
 import asyncio
 import os
 import re
 import time
-from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.completion import (
@@ -22,6 +27,12 @@ from prompt_toolkit.key_binding import KeyBindings
 from .config import COLORS, COMMANDS, SessionState, console
 from .image_utils import ImageData, get_clipboard_image
 
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterator
+
+    from prompt_toolkit.completion.base import CompleteEvent
+    from prompt_toolkit.key_binding.key_processor import KeyPressEvent
+
 # Regex patterns for context-aware completion
 AT_MENTION_RE = re.compile(r"@(?P<path>(?:[^\s@]|(?<=\\)\s)*)$")
 SLASH_COMMAND_RE = re.compile(r"^/(?P<command>[a-z]*)$")
@@ -33,6 +44,7 @@ class ImageTracker:
     """Track pasted images in the current conversation."""
 
     def __init__(self) -> None:
+        """이미지 트래커를 초기화합니다."""
         self.images: list[ImageData] = []
         self.next_id = 1
 
@@ -65,13 +77,16 @@ class FilePathCompleter(Completer):
     """Activate filesystem completion only when cursor is after '@'."""
 
     def __init__(self) -> None:
+        """파일 경로 자동완성 컴플리터를 초기화합니다."""
         self.path_completer = PathCompleter(
             expanduser=True,
             min_input_len=0,
             only_directories=False,
         )
 
-    def get_completions(self, document, complete_event):
+    def get_completions(
+        self, document: Document, complete_event: CompleteEvent
+    ) -> Iterator[Completion]:
         """Get file path completions when @ is detected."""
         text = document.text_before_cursor
 
@@ -112,7 +127,9 @@ class FilePathCompleter(Completer):
 class CommandCompleter(Completer):
     """Activate command completion only when line starts with '/'."""
 
-    def get_completions(self, document, _complete_event):
+    def get_completions(
+        self, document: Document, _complete_event: CompleteEvent
+    ) -> Iterator[Completion]:
         """Get command completions when / is at the start."""
         text = document.text_before_cursor
 
@@ -155,8 +172,8 @@ def parse_file_mentions(text: str) -> tuple[str, list[Path]]:
                 files.append(path)
             else:
                 console.print(f"[yellow]Warning: File not found: {match}[/yellow]")
-        except Exception as e:
-            console.print(f"[yellow]Warning: Invalid path {match}: {e}[/yellow]")
+        except OSError as err:
+            console.print(f"[yellow]Warning: Invalid path {match}: {err}[/yellow]")
 
     return text, files
 
@@ -221,7 +238,7 @@ def get_bottom_toolbar(
     return toolbar
 
 
-def create_prompt_session(
+def create_prompt_session(  # noqa: PLR0915
     _assistant_id: str, session_state: SessionState, image_tracker: ImageTracker | None = None
 ) -> PromptSession:
     """Create a configured PromptSession with all features."""
@@ -233,7 +250,7 @@ def create_prompt_session(
     kb = KeyBindings()
 
     @kb.add("c-c")
-    def _(event) -> None:
+    def _(event: KeyPressEvent) -> None:
         """Require double Ctrl+C within a short window to exit."""
         app = event.app
         now = time.monotonic()
@@ -272,7 +289,7 @@ def create_prompt_session(
 
     # Bind Ctrl+T to toggle auto-approve
     @kb.add("c-t")
-    def _(event) -> None:
+    def _(event: KeyPressEvent) -> None:
         """Toggle auto-approve mode."""
         session_state.toggle_auto_approve()
         # Force UI refresh to update toolbar
@@ -282,7 +299,9 @@ def create_prompt_session(
     if image_tracker:
         from prompt_toolkit.keys import Keys
 
-        def _handle_paste_with_image_check(event, pasted_text: str = "") -> None:
+        def _handle_paste_with_image_check(
+            event: KeyPressEvent, pasted_text: str = ""
+        ) -> None:
             """Check clipboard for image, otherwise insert pasted text."""
             # Try to get an image from clipboard
             clipboard_image = get_clipboard_image()
@@ -302,20 +321,20 @@ def create_prompt_session(
                     event.current_buffer.insert_text(clipboard_data.text)
 
         @kb.add(Keys.BracketedPaste)
-        def _(event) -> None:
+        def _(event: KeyPressEvent) -> None:
             """Handle bracketed paste (Cmd+V on macOS) - check for images first."""
             # Bracketed paste provides the pasted text in event.data
             pasted_text = event.data if hasattr(event, "data") else ""
             _handle_paste_with_image_check(event, pasted_text)
 
         @kb.add("c-v")
-        def _(event) -> None:
+        def _(event: KeyPressEvent) -> None:
             """Handle Ctrl+V paste - check for images first."""
             _handle_paste_with_image_check(event)
 
     # Bind regular Enter to submit (intuitive behavior)
     @kb.add("enter")
-    def _(event) -> None:
+    def _(event: KeyPressEvent) -> None:
         """Enter submits the input, unless completion menu is active."""
         buffer = event.current_buffer
 
@@ -344,19 +363,19 @@ def create_prompt_session(
 
     # Alt+Enter for newlines (press ESC then Enter, or Option+Enter on Mac)
     @kb.add("escape", "enter")
-    def _(event) -> None:
+    def _(event: KeyPressEvent) -> None:
         """Alt+Enter inserts a newline for multi-line input."""
         event.current_buffer.insert_text("\n")
 
     # Ctrl+E to open in external editor
     @kb.add("c-e")
-    def _(event) -> None:
+    def _(event: KeyPressEvent) -> None:
         """Open the current input in an external editor (nano by default)."""
         event.current_buffer.open_in_editor()
 
     # Backspace handler to retrigger completions and delete image tags as units
     @kb.add("backspace")
-    def _(event) -> None:
+    def _(event: KeyPressEvent) -> None:
         """Handle backspace: delete image tags as single unit, retrigger completion."""
         buffer = event.current_buffer
         text_before = buffer.document.text_before_cursor

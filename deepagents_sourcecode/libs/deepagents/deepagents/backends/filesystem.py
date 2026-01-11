@@ -1,10 +1,10 @@
-"""FilesystemBackend: Read and write files directly from the filesystem.
+"""FilesystemBackend: 파일 시스템에서 직접 파일을 읽고 씁니다.
 
-Security and search upgrades:
-- Secure path resolution with root containment when in virtual_mode (sandboxed to cwd)
-- Prevent symlink-following on file I/O using O_NOFOLLOW when available
-- Ripgrep-powered grep with JSON parsing, plus Python fallback with regex
-  and optional glob include filtering, while preserving virtual path behavior
+보안 및 검색 기능 개선:
+- virtual_mode(sandboxed to cwd)에서 루트 컨테인먼트를 통한 보안 경로 해결
+- 사용 가능한 경우 O_NOFOLLOW를 사용하여 파일 I/O에서 심볼로우 방지
+- JSON 파싱을 지원하는 Ripgrep 기반 grep, 정규식을 사용하는 Python 폴백 및
+  선택적 glob 포함 필터링, 가상 경로 동작 유지
 """
 
 import json
@@ -33,11 +33,11 @@ from deepagents.backends.utils import (
 
 
 class FilesystemBackend(BackendProtocol):
-    """Backend that reads and writes files directly from the filesystem.
+    """로컬 파일 시스템에서 직접 파일을 읽고/쓰는 백엔드입니다.
 
-    Files are accessed using their actual filesystem paths. Relative paths are
-    resolved relative to the current working directory. Content is read/written
-    as plain text, and metadata (timestamps) are derived from filesystem stats.
+    파일은 실제 파일 시스템 경로로 접근합니다. 상대 경로는 현재 작업 디렉토리(`cwd`) 기준으로
+    해석되며, 콘텐츠는 일반 텍스트로 읽고/씁니다. 메타데이터(타임스탬프 등)는 파일 시스템
+    stat 정보를 기반으로 계산합니다.
     """
 
     def __init__(
@@ -46,7 +46,7 @@ class FilesystemBackend(BackendProtocol):
         virtual_mode: bool = False,
         max_file_size_mb: int = 10,
     ) -> None:
-        """Initialize filesystem backend.
+        """파일 시스템 백엔드를 초기화합니다.
 
         Args:
             root_dir: Optional root directory for file operations. If provided,
@@ -58,7 +58,7 @@ class FilesystemBackend(BackendProtocol):
         self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
 
     def _resolve_path(self, key: str) -> Path:
-        """Resolve a file path with security checks.
+        """보안 검사를 포함해 파일 경로를 해석(resolve)합니다.
 
         When virtual_mode=True, treat incoming paths as virtual absolute paths under
         self.cwd, disallow traversal (.., ~) and ensure resolved path stays within root.
@@ -88,7 +88,7 @@ class FilesystemBackend(BackendProtocol):
         return (self.cwd / path).resolve()
 
     def ls_info(self, path: str) -> list[FileInfo]:
-        """List files and directories in the specified directory (non-recursive).
+        """지정한 디렉토리 바로 아래의 파일/폴더를 나열합니다(비재귀).
 
         Args:
             path: Absolute directory path to list files from.
@@ -103,12 +103,12 @@ class FilesystemBackend(BackendProtocol):
 
         results: list[FileInfo] = []
 
-        # Convert cwd to string for comparison
+        # 비교를 위해 cwd를 문자열로 변환
         cwd_str = str(self.cwd)
         if not cwd_str.endswith("/"):
             cwd_str += "/"
 
-        # List only direct children (non-recursive)
+        # 직계 자식만 나열(비재귀)
         try:
             for child_path in dir_path.iterdir():
                 try:
@@ -120,7 +120,7 @@ class FilesystemBackend(BackendProtocol):
                 abs_path = str(child_path)
 
                 if not self.virtual_mode:
-                    # Non-virtual mode: use absolute paths
+                    # non-virtual 모드: 절대 경로를 사용
                     if is_file:
                         try:
                             st = child_path.stat()
@@ -148,14 +148,14 @@ class FilesystemBackend(BackendProtocol):
                         except OSError:
                             results.append({"path": abs_path + "/", "is_dir": True})
                 else:
-                    # Virtual mode: strip cwd prefix
+                    # virtual 모드: cwd prefix를 제거하여 가상 경로로 변환
                     if abs_path.startswith(cwd_str):
                         relative_path = abs_path[len(cwd_str) :]
                     elif abs_path.startswith(str(self.cwd)):
-                        # Handle case where cwd doesn't end with /
+                        # cwd가 `/`로 끝나지 않는 케이스 보정
                         relative_path = abs_path[len(str(self.cwd)) :].lstrip("/")
                     else:
-                        # Path is outside cwd, return as-is or skip
+                        # cwd 밖의 경로: 그대로 반환하거나 스킵
                         relative_path = abs_path
 
                     virt_path = "/" + relative_path
@@ -189,7 +189,7 @@ class FilesystemBackend(BackendProtocol):
         except (OSError, PermissionError):
             pass
 
-        # Keep deterministic order by path
+        # 경로 기준으로 deterministic order 유지
         results.sort(key=lambda x: x.get("path", ""))
         return results
 
@@ -199,7 +199,7 @@ class FilesystemBackend(BackendProtocol):
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """Read file content with line numbers.
+        """파일을 읽어 라인 번호가 포함된 문자열로 반환합니다.
 
         Args:
             file_path: Absolute or relative file path.
@@ -215,7 +215,7 @@ class FilesystemBackend(BackendProtocol):
             return f"Error: File '{file_path}' not found"
 
         try:
-            # Open with O_NOFOLLOW where available to avoid symlink traversal
+            # 가능하면 O_NOFOLLOW로 열어 심볼릭 링크를 통한 우회를 방지
             fd = os.open(resolved_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
             with os.fdopen(fd, "r", encoding="utf-8") as f:
                 content = f.read()
@@ -241,8 +241,9 @@ class FilesystemBackend(BackendProtocol):
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """Create a new file with content.
-        Returns WriteResult. External storage sets files_update=None.
+        """새 파일을 생성하고 내용을 씁니다.
+
+        `WriteResult`를 반환합니다. 외부 스토리지 백엔드는 `files_update=None`을 사용합니다.
         """
         resolved_path = self._resolve_path(file_path)
 
@@ -250,10 +251,10 @@ class FilesystemBackend(BackendProtocol):
             return WriteResult(error=f"Cannot write to {file_path} because it already exists. Read and then make an edit, or write to a new path.")
 
         try:
-            # Create parent directories if needed
+            # 필요하면 상위 디렉토리를 생성
             resolved_path.parent.mkdir(parents=True, exist_ok=True)
 
-            # Prefer O_NOFOLLOW to avoid writing through symlinks
+            # 가능하면 O_NOFOLLOW를 사용해 심볼릭 링크를 통한 쓰기 우회를 방지
             flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
             if hasattr(os, "O_NOFOLLOW"):
                 flags |= os.O_NOFOLLOW
@@ -272,8 +273,9 @@ class FilesystemBackend(BackendProtocol):
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """Edit a file by replacing string occurrences.
-        Returns EditResult. External storage sets files_update=None.
+        """파일 내 문자열을 치환하여 편집합니다.
+
+        `EditResult`를 반환합니다. 외부 스토리지 백엔드는 `files_update=None`을 사용합니다.
         """
         resolved_path = self._resolve_path(file_path)
 
@@ -281,7 +283,7 @@ class FilesystemBackend(BackendProtocol):
             return EditResult(error=f"Error: File '{file_path}' not found")
 
         try:
-            # Read securely
+            # 안전하게 읽기
             fd = os.open(resolved_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
             with os.fdopen(fd, "r", encoding="utf-8") as f:
                 content = f.read()
@@ -293,7 +295,7 @@ class FilesystemBackend(BackendProtocol):
 
             new_content, occurrences = result
 
-            # Write securely
+            # 안전하게 쓰기
             flags = os.O_WRONLY | os.O_TRUNC
             if hasattr(os, "O_NOFOLLOW"):
                 flags |= os.O_NOFOLLOW
@@ -311,7 +313,7 @@ class FilesystemBackend(BackendProtocol):
         path: str | None = None,
         glob: str | None = None,
     ) -> list[GrepMatch] | str:
-        # Validate regex
+        # 정규식 검증
         try:
             re.compile(pattern)
         except re.error as e:
@@ -480,7 +482,7 @@ class FilesystemBackend(BackendProtocol):
         return results
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """Upload multiple files to the filesystem.
+        """여러 파일을 파일 시스템에 업로드합니다.
 
         Args:
             files: List of (path, content) tuples where content is bytes.
@@ -494,7 +496,7 @@ class FilesystemBackend(BackendProtocol):
             try:
                 resolved_path = self._resolve_path(path)
 
-                # Create parent directories if needed
+                # 필요하면 상위 디렉토리를 생성
                 resolved_path.parent.mkdir(parents=True, exist_ok=True)
 
                 flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
@@ -510,17 +512,18 @@ class FilesystemBackend(BackendProtocol):
             except PermissionError:
                 responses.append(FileUploadResponse(path=path, error="permission_denied"))
             except (ValueError, OSError) as e:
-                # ValueError from _resolve_path for path traversal, OSError for other file errors
+                # _resolve_path에서 경로 탐색(path traversal)일 때 ValueError,
+                # 그 외 파일 오류는 OSError가 발생할 수 있습니다.
                 if isinstance(e, ValueError) or "invalid" in str(e).lower():
                     responses.append(FileUploadResponse(path=path, error="invalid_path"))
                 else:
-                    # Generic error fallback
+                    # 일반적인 fallback
                     responses.append(FileUploadResponse(path=path, error="invalid_path"))
 
         return responses
 
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """Download multiple files from the filesystem.
+        """여러 파일을 파일 시스템에서 다운로드합니다.
 
         Args:
             paths: List of file paths to download.
@@ -532,8 +535,7 @@ class FilesystemBackend(BackendProtocol):
         for path in paths:
             try:
                 resolved_path = self._resolve_path(path)
-                # Use flags to optionally prevent symlink following if
-                # supported by the OS
+                # OS가 지원하면, 플래그로 심볼릭 링크 추적을 방지합니다.
                 fd = os.open(resolved_path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
                 with os.fdopen(fd, "rb") as f:
                     content = f.read()

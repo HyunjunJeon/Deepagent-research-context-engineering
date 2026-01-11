@@ -1,4 +1,7 @@
-"""Tool-specific approval widgets for HITL display."""
+"""HITL(승인) 화면에서 도구별(tool-specific) 표시를 담당하는 위젯들입니다.
+
+Tool-specific approval widgets for HITL display.
+"""
 
 from __future__ import annotations
 

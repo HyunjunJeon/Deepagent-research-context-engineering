@@ -1,4 +1,4 @@
-"""Middleware to patch dangling tool calls in the messages history."""
+"""메시지 히스토리의 끊긴(tool message가 없는) tool call을 보정하는 미들웨어입니다."""
 
 from typing import Any
 
@@ -9,16 +9,16 @@ from langgraph.types import Overwrite
 
 
 class PatchToolCallsMiddleware(AgentMiddleware):
-    """Middleware to patch dangling tool calls in the messages history."""
+    """메시지 히스토리의 끊긴(tool message가 없는) tool call을 보정합니다."""
 
     def before_agent(self, state: AgentState, runtime: Runtime[Any]) -> dict[str, Any] | None:  # noqa: ARG002
-        """Before the agent runs, handle dangling tool calls from any AIMessage."""
+        """에이전트 실행 전에, AIMessage에 남은 끊긴 tool call을 처리합니다."""
         messages = state["messages"]
         if not messages or len(messages) == 0:
             return None
 
         patched_messages = []
-        # Iterate over the messages and add any dangling tool calls
+        # 메시지를 순회하면서 끊긴 tool call이 있으면 ToolMessage를 보완합니다.
         for i, msg in enumerate(messages):
             patched_messages.append(msg)
             if msg.type == "ai" and msg.tool_calls:
@@ -28,7 +28,7 @@ class PatchToolCallsMiddleware(AgentMiddleware):
                         None,
                     )
                     if corresponding_tool_msg is None:
-                        # We have a dangling tool call which needs a ToolMessage
+                        # ToolMessage가 누락된 끊긴 tool call이므로 보정합니다.
                         tool_msg = (
                             f"Tool call {tool_call['name']} with id {tool_call['id']} was "
                             "cancelled - another message came in before it could be completed."

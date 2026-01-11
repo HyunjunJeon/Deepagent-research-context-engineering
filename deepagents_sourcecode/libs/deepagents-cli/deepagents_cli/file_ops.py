@@ -1,8 +1,12 @@
-"""Helpers for tracking file operations and computing diffs for CLI display."""
+"""CLI 표시를 위해 파일 작업을 추적하고 diff를 계산하는 유틸리티입니다.
+
+Helpers for tracking file operations and computing diffs for CLI display.
+"""
 
 from __future__ import annotations
 
 import difflib
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -13,8 +17,11 @@ from deepagents_cli.config import settings
 
 if TYPE_CHECKING:
     from deepagents.backends.protocol import BACKEND_TYPES
+    from langchain_core.messages import ToolMessage
 
 FileOpStatus = Literal["pending", "success", "error"]
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -249,6 +256,7 @@ class FileOpTracker:
     def start_operation(
         self, tool_name: str, args: dict[str, Any], tool_call_id: str | None
     ) -> None:
+        """파일 도구 호출을 추적하기 위한 operation을 시작합니다."""
         if tool_name not in {"read_file", "write_file", "edit_file"}:
             return
         path_str = str(args.get("file_path") or args.get("path") or "")
@@ -272,7 +280,8 @@ class FileOpTracker:
                         record.before_content = responses[0].content.decode("utf-8")
                     else:
                         record.before_content = ""
-                except Exception:
+                except Exception as err:  # noqa: BLE001
+                    logger.debug("Failed to download file content before operation.", exc_info=err)
                     record.before_content = ""
             elif record.physical_path:
                 record.before_content = _safe_read(record.physical_path) or ""
@@ -303,12 +312,19 @@ class FileOpTracker:
                             record.before_content = responses[0].content.decode("utf-8")
                         else:
                             record.before_content = ""
-                    except Exception:
+                    except Exception as err:  # noqa: BLE001
+                        logger.debug(
+                            "Failed to download file content before operation.",
+                            exc_info=err,
+                        )
                         record.before_content = ""
                 elif record.physical_path:
                     record.before_content = _safe_read(record.physical_path) or ""
 
-    def complete_with_message(self, tool_message: Any) -> FileOperationRecord | None:
+    def complete_with_message(  # noqa: PLR0912, PLR0915
+        self, tool_message: ToolMessage
+    ) -> FileOperationRecord | None:
+        """도구 실행 결과(ToolMessage)를 사용해 operation을 완료 처리합니다."""
         tool_call_id = getattr(tool_message, "tool_call_id", None)
         record = self.active.get(tool_call_id)
         if record is None:
@@ -430,7 +446,8 @@ class FileOpTracker:
                         record.after_content = None
                 else:
                     record.after_content = None
-            except Exception:
+            except Exception as err:  # noqa: BLE001
+                logger.debug("Failed to download file content after operation.", exc_info=err)
                 record.after_content = None
         else:
             # Fallback: direct filesystem read when no backend provided

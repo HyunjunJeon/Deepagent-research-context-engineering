@@ -1,4 +1,7 @@
-"""Welcome banner widget for deepagents-cli."""
+"""deepagents-cli 시작 시 보여주는 환영 배너 위젯입니다.
+
+Welcome banner widget for deepagents-cli.
+"""
 
 from __future__ import annotations
 

@@ -1,4 +1,10 @@
-"""Custom tools for the CLI agent."""
+"""CLI 에이전트용 커스텀 도구 모음입니다.
+
+Custom tools for the CLI agent.
+"""
+
+# NOTE(KR): 이 파일의 `http_request` / `web_search` / `fetch_url` 함수 docstring은
+# LangChain tool description으로 사용될 수 있으므로 번역/수정하지 마세요(영어 유지).
 
 from typing import Any, Literal
 
@@ -7,6 +13,8 @@ from markdownify import markdownify
 from tavily import TavilyClient
 
 from deepagents_cli.config import settings
+
+_HTTP_ERROR_STATUS_CODE_MIN = 400
 
 # Initialize Tavily client if API key is available
 tavily_client = TavilyClient(api_key=settings.tavily_api_key) if settings.has_tavily else None
@@ -34,27 +42,31 @@ def http_request(
         Dictionary with response data including status, headers, and content
     """
     try:
-        kwargs = {"url": url, "method": method.upper(), "timeout": timeout}
-
-        if headers:
-            kwargs["headers"] = headers
-        if params:
-            kwargs["params"] = params
-        if data:
+        json_data: dict[str, Any] | None = None
+        body_data: str | None = None
+        if data is not None:
             if isinstance(data, dict):
-                kwargs["json"] = data
+                json_data = data
             else:
-                kwargs["data"] = data
+                body_data = data
 
-        response = requests.request(**kwargs)
+        response = requests.request(
+            method=method.upper(),
+            url=url,
+            headers=headers,
+            params=params,
+            data=body_data,
+            json=json_data,
+            timeout=timeout,
+        )
 
         try:
             content = response.json()
-        except:
+        except ValueError:
             content = response.text
 
         return {
-            "success": response.status_code < 400,
+            "success": response.status_code < _HTTP_ERROR_STATUS_CODE_MIN,
             "status_code": response.status_code,
             "headers": dict(response.headers),
             "content": content,
@@ -77,7 +89,7 @@ def http_request(
             "content": f"Request error: {e!s}",
             "url": url,
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {
             "success": False,
             "status_code": 0,
@@ -89,10 +101,11 @@ def http_request(
 
 def web_search(
     query: str,
+    *,
     max_results: int = 5,
     topic: Literal["general", "news", "finance"] = "general",
     include_raw_content: bool = False,
-):
+) -> dict[str, Any]:
     """Search the web using Tavily for current information and documentation.
 
     This tool searches the web and returns relevant results. After receiving results,
@@ -122,7 +135,9 @@ def web_search(
     """
     if tavily_client is None:
         return {
-            "error": "Tavily API key not configured. Please set TAVILY_API_KEY environment variable.",
+            "error": (
+                "Tavily API key not configured. Please set TAVILY_API_KEY environment variable."
+            ),
             "query": query,
         }
 
@@ -133,7 +148,7 @@ def web_search(
             include_raw_content=include_raw_content,
             topic=topic,
         )
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return {"error": f"Web search error: {e!s}", "query": query}
 
 
@@ -174,10 +189,19 @@ def fetch_url(url: str, timeout: int = 30) -> dict[str, Any]:
         markdown_content = markdownify(response.text)
 
         return {
+            "success": True,
             "url": str(response.url),
             "markdown_content": markdown_content,
             "status_code": response.status_code,
             "content_length": len(markdown_content),
         }
-    except Exception as e:
-        return {"error": f"Fetch URL error: {e!s}", "url": url}
+    except requests.exceptions.Timeout:
+        return {
+            "success": False,
+            "error": f"Fetch URL timed out after {timeout} seconds",
+            "url": url,
+        }
+    except requests.exceptions.RequestException as e:
+        return {"success": False, "error": f"Fetch URL request error: {e!s}", "url": url}
+    except Exception as e:  # noqa: BLE001
+        return {"success": False, "error": f"Fetch URL error: {e!s}", "url": url}

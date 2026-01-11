@@ -1,19 +1,22 @@
+"""deepagents_acp 서버 동작을 검증하는 테스트들입니다."""
+
 from contextlib import asynccontextmanager
 from typing import Any
 
-from acp.schema import NewSessionRequest, PromptRequest
 from acp.schema import (
-    TextContentBlock,
+    AllowedOutcome,
+    NewSessionRequest,
+    PromptRequest,
     RequestPermissionRequest,
     RequestPermissionResponse,
-    AllowedOutcome,
+    TextContentBlock,
 )
+from deepagents_acp.server import DeepagentsACP
 from dirty_equals import IsUUID
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
-from deepagents_acp.server import DeepagentsACP
 from tests.chat_model import GenericFakeChatModel
 
 
@@ -68,13 +71,13 @@ async def deepagents_acp_test_context(
     stream_delimiter: str | None = r"(\s)",
     middleware: list[Any] | None = None,
 ):
-    """Context manager for testing DeepagentsACP.
+    r"""Context manager for testing DeepagentsACP.
 
     Args:
         messages: List of messages for the fake model to return
         prompt_request: The prompt request to send to the agent
         tools: List of tools to provide to the agent (defaults to [])
-        stream_delimiter: How to chunk content when streaming (default: r"(\\s)" for whitespace)
+        stream_delimiter: How to chunk content when streaming (default: r"(\s)" for whitespace)
         middleware: Optional middleware to add to the agent graph
 
     Yields:
@@ -422,8 +425,8 @@ async def test_fake_chat_model_streaming() -> None:
 
 async def test_human_in_the_loop_approval() -> None:
     """Test that DeepagentsACP handles HITL interrupts and permission requests correctly."""
-    from langchain.agents.middleware import HumanInTheLoopMiddleware
     from deepagents.graph import create_deep_agent
+    from langchain.agents.middleware import HumanInTheLoopMiddleware
 
     prompt_request = PromptRequest(
         sessionId="",  # Will be set below

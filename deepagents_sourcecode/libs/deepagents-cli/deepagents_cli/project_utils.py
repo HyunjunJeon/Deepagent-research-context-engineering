@@ -1,10 +1,10 @@
-"""Utilities for project root detection and project-specific configuration."""
+"""프로젝트 루트 탐지 및 프로젝트별 설정을 위한 유틸리티입니다."""
 
 from pathlib import Path
 
 
 def find_project_root(start_path: Path | None = None) -> Path | None:
-    """Find the project root by looking for .git directory.
+    """`.git` 디렉토리를 기준으로 프로젝트 루트를 찾습니다.
 
     Walks up the directory tree from start_path (or cwd) looking for a .git
     directory, which indicates the project root.
@@ -17,7 +17,7 @@ def find_project_root(start_path: Path | None = None) -> Path | None:
     """
     current = Path(start_path or Path.cwd()).resolve()
 
-    # Walk up the directory tree
+    # 디렉토리 트리를 위로 올라가며 탐색
     for parent in [current, *list(current.parents)]:
         git_dir = parent / ".git"
         if git_dir.exists():
@@ -27,7 +27,7 @@ def find_project_root(start_path: Path | None = None) -> Path | None:
 
 
 def find_project_agent_md(project_root: Path) -> list[Path]:
-    """Find project-specific agent.md file(s).
+    """프로젝트 전용 `agent.md` 파일을 찾습니다(복수 가능).
 
     Checks two locations and returns ALL that exist:
     1. project_root/.deepagents/agent.md
@@ -43,12 +43,12 @@ def find_project_agent_md(project_root: Path) -> list[Path]:
     """
     paths = []
 
-    # Check .deepagents/agent.md (preferred)
+    # .deepagents/agent.md 확인(우선)
     deepagents_md = project_root / ".deepagents" / "agent.md"
     if deepagents_md.exists():
         paths.append(deepagents_md)
 
-    # Check root agent.md (fallback, but also include if both exist)
+    # 루트 agent.md 확인(폴백이지만 둘 다 있으면 함께 포함)
     root_md = project_root / "agent.md"
     if root_md.exists():
         paths.append(root_md)

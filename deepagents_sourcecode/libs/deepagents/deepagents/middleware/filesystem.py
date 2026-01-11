@@ -1,4 +1,4 @@
-"""Middleware for providing filesystem tools to an agent."""
+"""에이전트에 파일 시스템 도구를 제공하는 미들웨어입니다."""
 # ruff: noqa: E501
 
 import os
@@ -44,24 +44,24 @@ DEFAULT_READ_LIMIT = 500
 
 
 class FileData(TypedDict):
-    """Data structure for storing file contents with metadata."""
+    """파일 내용을 메타데이터와 함께 저장하기 위한 데이터 구조입니다."""
 
     content: list[str]
-    """Lines of the file."""
+    """파일의 각 라인."""
 
     created_at: str
-    """ISO 8601 timestamp of file creation."""
+    """파일 생성 시각(ISO 8601)."""
 
     modified_at: str
-    """ISO 8601 timestamp of last modification."""
+    """파일 마지막 수정 시각(ISO 8601)."""
 
 
 def _file_data_reducer(left: dict[str, FileData] | None, right: dict[str, FileData | None]) -> dict[str, FileData]:
-    """Merge file updates with support for deletions.
+    """파일 업데이트를 병합하며, 삭제를 지원합니다.
 
-    This reducer enables file deletion by treating `None` values in the right
-    dictionary as deletion markers. It's designed to work with LangGraph's
-    state management where annotated reducers control how state updates merge.
+    오른쪽 딕셔너리의 값이 `None`인 엔트리를 “삭제 마커”로 취급해 삭제를 구현합니다.
+    LangGraph의 state 관리에서 annotated reducer가 state 업데이트 병합 방식을 제어한다는
+    전제에 맞춰 설계되었습니다.
 
     Args:
         left: Existing files dictionary. May be `None` during initialization.
@@ -93,15 +93,13 @@ def _file_data_reducer(left: dict[str, FileData] | None, right: dict[str, FileDa
 
 
 def _validate_path(path: str, *, allowed_prefixes: Sequence[str] | None = None) -> str:
-    r"""Validate and normalize file path for security.
+    r"""보안 관점에서 파일 경로를 검증하고 정규화합니다.
 
-    Ensures paths are safe to use by preventing directory traversal attacks
-    and enforcing consistent formatting. All paths are normalized to use
-    forward slashes and start with a leading slash.
+    디렉토리 트래버설 공격을 방지하고, 일관된 포맷을 강제하여 안전한 경로만 사용하도록 합니다.
+    모든 경로는 `/`로 시작하며, 경로 구분자는 forward slash(`/`)로 정규화됩니다.
 
-    This function is designed for virtual filesystem paths and rejects
-    Windows absolute paths (e.g., C:/..., F:/...) to maintain consistency
-    and prevent path format ambiguity.
+    이 함수는 “가상 파일시스템 경로(virtual paths)”를 대상으로 설계되었으며,
+    경로 형식의 모호함을 피하기 위해 Windows 절대 경로(예: `C:/...`, `F:/...`)는 거부합니다.
 
     Args:
         path: The path to validate and normalize.
@@ -130,8 +128,8 @@ def _validate_path(path: str, *, allowed_prefixes: Sequence[str] | None = None) 
         msg = f"Path traversal not allowed: {path}"
         raise ValueError(msg)
 
-    # Reject Windows absolute paths (e.g., C:\..., D:/...)
-    # This maintains consistency in virtual filesystem paths
+    # Windows 절대 경로(예: C:\..., D:/...)는 거부합니다.
+    # 가상 파일시스템 경로 포맷의 일관성을 유지하기 위함입니다.
     if re.match(r"^[a-zA-Z]:", path):
         msg = f"Windows absolute paths are not supported: {path}. Please use virtual paths starting with / (e.g., /workspace/file.txt)"
         raise ValueError(msg)
@@ -150,10 +148,10 @@ def _validate_path(path: str, *, allowed_prefixes: Sequence[str] | None = None) 
 
 
 class FilesystemState(AgentState):
-    """State for the filesystem middleware."""
+    """FilesystemMiddleware의 state 스키마입니다."""
 
     files: Annotated[NotRequired[dict[str, FileData]], _file_data_reducer]
-    """Files in the filesystem."""
+    """파일 시스템에 저장된 파일들."""
 
 
 LIST_FILES_TOOL_DESCRIPTION = """Lists all files in the filesystem, filtering by directory.
@@ -296,14 +294,14 @@ Use this tool to run commands, scripts, tests, builds, and other shell operation
 
 
 def _get_backend(backend: BACKEND_TYPES, runtime: ToolRuntime) -> BackendProtocol:
-    """Get the resolved backend instance from backend or factory.
+    """백엔드 또는 팩토리에서 해결된 백엔드 인스턴스를 가져옵니다.
 
     Args:
-        backend: Backend instance or factory function.
-        runtime: The tool runtime context.
+        backend: 백엔드 인스턴스 또는 팩토리 함수.
+        runtime: 도구 런타임 컨텍스트.
 
     Returns:
-        Resolved backend instance.
+        해결된 백엔드 인스턴스.
     """
     if callable(backend):
         return backend(runtime)
@@ -314,19 +312,19 @@ def _ls_tool_generator(
     backend: BackendProtocol | Callable[[ToolRuntime], BackendProtocol],
     custom_description: str | None = None,
 ) -> BaseTool:
-    """Generate the ls (list files) tool.
+    """파일 목록(ls) 도구를 생성합니다.
 
     Args:
-        backend: Backend to use for file storage, or a factory function that takes runtime and returns a backend.
-        custom_description: Optional custom description for the tool.
+        backend: 파일 저장에 사용할 백엔드, 또는 런타임을 받아 백엔드를 반환하는 팩토리 함수.
+        custom_description: 도구의 선택적 사용자 정의 설명.
 
     Returns:
-        Configured ls tool that lists files using the backend.
+        백엔드를 사용하여 파일을 나열하는 구성된 ls 도구.
     """
     tool_description = custom_description or LIST_FILES_TOOL_DESCRIPTION
 
     def sync_ls(runtime: ToolRuntime[None, FilesystemState], path: str) -> str:
-        """Synchronous wrapper for ls tool."""
+        """파일 목록(ls) 도구의 동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         validated_path = _validate_path(path)
         infos = resolved_backend.ls_info(validated_path)
@@ -335,7 +333,7 @@ def _ls_tool_generator(
         return str(result)
 
     async def async_ls(runtime: ToolRuntime[None, FilesystemState], path: str) -> str:
-        """Asynchronous wrapper for ls tool."""
+        """파일 목록(ls) 도구의 비동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         validated_path = _validate_path(path)
         infos = await resolved_backend.als_info(validated_path)
@@ -355,14 +353,14 @@ def _read_file_tool_generator(
     backend: BackendProtocol | Callable[[ToolRuntime], BackendProtocol],
     custom_description: str | None = None,
 ) -> BaseTool:
-    """Generate the read_file tool.
+    """`read_file` 도구를 생성합니다.
 
     Args:
-        backend: Backend to use for file storage, or a factory function that takes runtime and returns a backend.
-        custom_description: Optional custom description for the tool.
+        backend: 파일 저장에 사용할 백엔드 또는 (runtime을 받아 백엔드를 반환하는) 팩토리 함수.
+        custom_description: 도구 설명을 커스텀할 때 사용(선택).
 
     Returns:
-        Configured read_file tool that reads files using the backend.
+        backend를 통해 파일을 읽는 `read_file` 도구.
     """
     tool_description = custom_description or READ_FILE_TOOL_DESCRIPTION
 
@@ -372,7 +370,7 @@ def _read_file_tool_generator(
         offset: int = DEFAULT_READ_OFFSET,
         limit: int = DEFAULT_READ_LIMIT,
     ) -> str:
-        """Synchronous wrapper for read_file tool."""
+        """`read_file` 도구의 동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         file_path = _validate_path(file_path)
         return resolved_backend.read(file_path, offset=offset, limit=limit)
@@ -383,7 +381,7 @@ def _read_file_tool_generator(
         offset: int = DEFAULT_READ_OFFSET,
         limit: int = DEFAULT_READ_LIMIT,
     ) -> str:
-        """Asynchronous wrapper for read_file tool."""
+        """`read_file` 도구의 비동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         file_path = _validate_path(file_path)
         return await resolved_backend.aread(file_path, offset=offset, limit=limit)
@@ -400,14 +398,14 @@ def _write_file_tool_generator(
     backend: BackendProtocol | Callable[[ToolRuntime], BackendProtocol],
     custom_description: str | None = None,
 ) -> BaseTool:
-    """Generate the write_file tool.
+    """`write_file` 도구를 생성합니다.
 
     Args:
-        backend: Backend to use for file storage, or a factory function that takes runtime and returns a backend.
-        custom_description: Optional custom description for the tool.
+        backend: 파일 저장에 사용할 백엔드 또는 (runtime을 받아 백엔드를 반환하는) 팩토리 함수.
+        custom_description: 도구 설명을 커스텀할 때 사용(선택).
 
     Returns:
-        Configured write_file tool that creates new files using the backend.
+        backend를 통해 새 파일을 생성하는 `write_file` 도구.
     """
     tool_description = custom_description or WRITE_FILE_TOOL_DESCRIPTION
 
@@ -416,13 +414,13 @@ def _write_file_tool_generator(
         content: str,
         runtime: ToolRuntime[None, FilesystemState],
     ) -> Command | str:
-        """Synchronous wrapper for write_file tool."""
+        """`write_file` 도구의 동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         file_path = _validate_path(file_path)
         res: WriteResult = resolved_backend.write(file_path, content)
         if res.error:
             return res.error
-        # If backend returns state update, wrap into Command with ToolMessage
+        # backend가 state 업데이트를 반환하면, ToolMessage와 함께 Command로 감쌉니다.
         if res.files_update is not None:
             return Command(
                 update={
@@ -442,13 +440,13 @@ def _write_file_tool_generator(
         content: str,
         runtime: ToolRuntime[None, FilesystemState],
     ) -> Command | str:
-        """Asynchronous wrapper for write_file tool."""
+        """`write_file` 도구의 비동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         file_path = _validate_path(file_path)
         res: WriteResult = await resolved_backend.awrite(file_path, content)
         if res.error:
             return res.error
-        # If backend returns state update, wrap into Command with ToolMessage
+        # backend가 state 업데이트를 반환하면, ToolMessage와 함께 Command로 감쌉니다.
         if res.files_update is not None:
             return Command(
                 update={
@@ -475,14 +473,14 @@ def _edit_file_tool_generator(
     backend: BackendProtocol | Callable[[ToolRuntime], BackendProtocol],
     custom_description: str | None = None,
 ) -> BaseTool:
-    """Generate the edit_file tool.
+    """`edit_file` 도구를 생성합니다.
 
     Args:
-        backend: Backend to use for file storage, or a factory function that takes runtime and returns a backend.
-        custom_description: Optional custom description for the tool.
+        backend: 파일 저장에 사용할 백엔드 또는 (runtime을 받아 백엔드를 반환하는) 팩토리 함수.
+        custom_description: 도구 설명을 커스텀할 때 사용(선택).
 
     Returns:
-        Configured edit_file tool that performs string replacements in files using the backend.
+        backend를 통해 파일 내 문자열 치환을 수행하는 `edit_file` 도구.
     """
     tool_description = custom_description or EDIT_FILE_TOOL_DESCRIPTION
 
@@ -494,7 +492,7 @@ def _edit_file_tool_generator(
         *,
         replace_all: bool = False,
     ) -> Command | str:
-        """Synchronous wrapper for edit_file tool."""
+        """`edit_file` 도구의 동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         file_path = _validate_path(file_path)
         res: EditResult = resolved_backend.edit(file_path, old_string, new_string, replace_all=replace_all)
@@ -522,7 +520,7 @@ def _edit_file_tool_generator(
         *,
         replace_all: bool = False,
     ) -> Command | str:
-        """Asynchronous wrapper for edit_file tool."""
+        """`edit_file` 도구의 비동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         file_path = _validate_path(file_path)
         res: EditResult = await resolved_backend.aedit(file_path, old_string, new_string, replace_all=replace_all)
@@ -554,19 +552,19 @@ def _glob_tool_generator(
     backend: BackendProtocol | Callable[[ToolRuntime], BackendProtocol],
     custom_description: str | None = None,
 ) -> BaseTool:
-    """Generate the glob tool.
+    """`glob` 도구를 생성합니다.
 
     Args:
-        backend: Backend to use for file storage, or a factory function that takes runtime and returns a backend.
-        custom_description: Optional custom description for the tool.
+        backend: 파일 저장에 사용할 백엔드 또는 (runtime을 받아 백엔드를 반환하는) 팩토리 함수.
+        custom_description: 도구 설명을 커스텀할 때 사용(선택).
 
     Returns:
-        Configured glob tool that finds files by pattern using the backend.
+        backend를 통해 패턴 매칭으로 파일을 찾는 `glob` 도구.
     """
     tool_description = custom_description or GLOB_TOOL_DESCRIPTION
 
     def sync_glob(pattern: str, runtime: ToolRuntime[None, FilesystemState], path: str = "/") -> str:
-        """Synchronous wrapper for glob tool."""
+        """`glob` 도구의 동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         infos = resolved_backend.glob_info(pattern, path=path)
         paths = [fi.get("path", "") for fi in infos]
@@ -574,7 +572,7 @@ def _glob_tool_generator(
         return str(result)
 
     async def async_glob(pattern: str, runtime: ToolRuntime[None, FilesystemState], path: str = "/") -> str:
-        """Asynchronous wrapper for glob tool."""
+        """`glob` 도구의 비동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         infos = await resolved_backend.aglob_info(pattern, path=path)
         paths = [fi.get("path", "") for fi in infos]
@@ -593,14 +591,14 @@ def _grep_tool_generator(
     backend: BackendProtocol | Callable[[ToolRuntime], BackendProtocol],
     custom_description: str | None = None,
 ) -> BaseTool:
-    """Generate the grep tool.
+    """`grep` 도구를 생성합니다.
 
     Args:
-        backend: Backend to use for file storage, or a factory function that takes runtime and returns a backend.
-        custom_description: Optional custom description for the tool.
+        backend: 파일 저장에 사용할 백엔드 또는 (runtime을 받아 백엔드를 반환하는) 팩토리 함수.
+        custom_description: 도구 설명을 커스텀할 때 사용(선택).
 
     Returns:
-        Configured grep tool that searches for patterns in files using the backend.
+        backend를 통해 파일 내 패턴 검색을 수행하는 `grep` 도구.
     """
     tool_description = custom_description or GREP_TOOL_DESCRIPTION
 
@@ -611,7 +609,7 @@ def _grep_tool_generator(
         glob: str | None = None,
         output_mode: Literal["files_with_matches", "content", "count"] = "files_with_matches",
     ) -> str:
-        """Synchronous wrapper for grep tool."""
+        """`grep` 도구의 동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         raw = resolved_backend.grep_raw(pattern, path=path, glob=glob)
         if isinstance(raw, str):
@@ -626,7 +624,7 @@ def _grep_tool_generator(
         glob: str | None = None,
         output_mode: Literal["files_with_matches", "content", "count"] = "files_with_matches",
     ) -> str:
-        """Asynchronous wrapper for grep tool."""
+        """`grep` 도구의 비동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
         raw = await resolved_backend.agrep_raw(pattern, path=path, glob=glob)
         if isinstance(raw, str):
@@ -643,25 +641,25 @@ def _grep_tool_generator(
 
 
 def _supports_execution(backend: BackendProtocol) -> bool:
-    """Check if a backend supports command execution.
+    """backend가 커맨드 실행을 지원하는지 확인합니다.
 
-    For CompositeBackend, checks if the default backend supports execution.
-    For other backends, checks if they implement SandboxBackendProtocol.
+    - `CompositeBackend`인 경우: `default` backend가 실행을 지원하는지 확인합니다.
+    - 그 외의 경우: `SandboxBackendProtocol` 구현 여부로 판단합니다.
 
     Args:
-        backend: The backend to check.
+        backend: 확인할 backend.
 
     Returns:
-        True if the backend supports execution, False otherwise.
+        실행을 지원하면 `True`, 아니면 `False`.
     """
-    # Import here to avoid circular dependency
+    # 순환 의존(circular dependency)을 피하기 위해 여기서 import 합니다.
     from deepagents.backends.composite import CompositeBackend
 
-    # For CompositeBackend, check the default backend
+    # CompositeBackend는 default backend가 실행을 지원하는지 확인합니다.
     if isinstance(backend, CompositeBackend):
         return isinstance(backend.default, SandboxBackendProtocol)
 
-    # For other backends, use isinstance check
+    # 그 외 backend는 isinstance로 실행 지원 여부를 판단합니다.
     return isinstance(backend, SandboxBackendProtocol)
 
 
@@ -669,14 +667,14 @@ def _execute_tool_generator(
     backend: BackendProtocol | Callable[[ToolRuntime], BackendProtocol],
     custom_description: str | None = None,
 ) -> BaseTool:
-    """Generate the execute tool for sandbox command execution.
+    """샌드박스 커맨드 실행을 위한 `execute` 도구를 생성합니다.
 
     Args:
-        backend: Backend to use for execution, or a factory function that takes runtime and returns a backend.
-        custom_description: Optional custom description for the tool.
+        backend: 실행에 사용할 backend 또는 (runtime을 받아 backend를 반환하는) 팩토리 함수.
+        custom_description: 도구 설명을 커스텀할 때 사용(선택).
 
     Returns:
-        Configured execute tool that runs commands if backend supports SandboxBackendProtocol.
+        backend가 `SandboxBackendProtocol`을 지원할 때 커맨드를 실행하는 `execute` 도구.
     """
     tool_description = custom_description or EXECUTE_TOOL_DESCRIPTION
 
@@ -684,10 +682,10 @@ def _execute_tool_generator(
         command: str,
         runtime: ToolRuntime[None, FilesystemState],
     ) -> str:
-        """Synchronous wrapper for execute tool."""
+        """`execute` 도구의 동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
 
-        # Runtime check - fail gracefully if not supported
+        # 런타임 체크: 지원하지 않으면 명시적인 오류 메시지로 종료
         if not _supports_execution(resolved_backend):
             return (
                 "Error: Execution not available. This agent's backend "
@@ -698,10 +696,10 @@ def _execute_tool_generator(
         try:
             result = resolved_backend.execute(command)
         except NotImplementedError as e:
-            # Handle case where execute() exists but raises NotImplementedError
+            # execute()가 존재하지만 NotImplementedError를 던지는 케이스 처리
             return f"Error: Execution not available. {e}"
 
-        # Format output for LLM consumption
+        # (LLM 입력으로 쓰기 좋게) 출력 포맷팅
         parts = [result.output]
 
         if result.exit_code is not None:
@@ -717,10 +715,10 @@ def _execute_tool_generator(
         command: str,
         runtime: ToolRuntime[None, FilesystemState],
     ) -> str:
-        """Asynchronous wrapper for execute tool."""
+        """`execute` 도구의 비동기 래퍼입니다."""
         resolved_backend = _get_backend(backend, runtime)
 
-        # Runtime check - fail gracefully if not supported
+        # 런타임 체크: 지원하지 않으면 명시적인 오류 메시지로 종료
         if not _supports_execution(resolved_backend):
             return (
                 "Error: Execution not available. This agent's backend "
@@ -731,10 +729,10 @@ def _execute_tool_generator(
         try:
             result = await resolved_backend.aexecute(command)
         except NotImplementedError as e:
-            # Handle case where execute() exists but raises NotImplementedError
+            # execute()가 존재하지만 NotImplementedError를 던지는 케이스 처리
             return f"Error: Execution not available. {e}"
 
-        # Format output for LLM consumption
+        # (LLM 입력으로 쓰기 좋게) 출력 포맷팅
         parts = [result.output]
 
         if result.exit_code is not None:
@@ -769,14 +767,14 @@ def _get_filesystem_tools(
     backend: BackendProtocol,
     custom_tool_descriptions: dict[str, str] | None = None,
 ) -> list[BaseTool]:
-    """Get filesystem and execution tools.
+    """파일 시스템 도구(및 가능한 경우 실행 도구)를 구성해 반환합니다.
 
     Args:
-        backend: Backend to use for file storage and optional execution, or a factory function that takes runtime and returns a backend.
-        custom_tool_descriptions: Optional custom descriptions for tools.
+        backend: 파일 저장(및 선택적 실행)에 사용할 backend.
+        custom_tool_descriptions: 도구별 커스텀 설명(선택).
 
     Returns:
-        List of configured tools: ls, read_file, write_file, edit_file, glob, grep, execute.
+        구성된 도구 리스트: `ls`, `read_file`, `write_file`, `edit_file`, `glob`, `grep`, `execute`.
     """
     if custom_tool_descriptions is None:
         custom_tool_descriptions = {}
@@ -799,23 +797,22 @@ Here are the first 10 lines of the result:
 
 
 class FilesystemMiddleware(AgentMiddleware):
-    """Middleware for providing filesystem and optional execution tools to an agent.
+    """에이전트에 파일 시스템 도구(및 선택적 실행 도구)를 제공하는 미들웨어입니다.
 
-    This middleware adds filesystem tools to the agent: ls, read_file, write_file,
-    edit_file, glob, and grep. Files can be stored using any backend that implements
-    the BackendProtocol.
+    이 미들웨어는 에이전트에 아래 도구들을 추가합니다.
+    - 파일 시스템 도구: `ls`, `read_file`, `write_file`, `edit_file`, `glob`, `grep`
+    - (선택) 실행 도구: `execute` (backend가 `SandboxBackendProtocol`을 구현할 때)
 
-    If the backend implements SandboxBackendProtocol, an execute tool is also added
-    for running shell commands.
+    파일 저장은 `BackendProtocol`을 구현하는 어떤 backend든 사용할 수 있습니다.
 
     Args:
-        backend: Backend for file storage and optional execution. If not provided, defaults to StateBackend
-            (ephemeral storage in agent state). For persistent storage or hybrid setups,
-            use CompositeBackend with custom routes. For execution support, use a backend
-            that implements SandboxBackendProtocol.
-        system_prompt: Optional custom system prompt override.
-        custom_tool_descriptions: Optional custom tool descriptions override.
-        tool_token_limit_before_evict: Optional token limit before evicting a tool result to the filesystem.
+        backend: 파일 저장(및 선택적 실행)에 사용할 backend. 미지정 시 `StateBackend`를 기본값으로 사용합니다
+            (에이전트 state에 저장되는 일시적(ephemeral) 스토리지).
+            영구 저장이나 하이브리드 구성이 필요하면 route를 설정한 `CompositeBackend`를 사용하세요.
+            커맨드 실행이 필요하면 `SandboxBackendProtocol`을 구현한 backend를 사용해야 합니다.
+        system_prompt: 커스텀 system prompt 오버라이드(선택).
+        custom_tool_descriptions: 도구 설명 오버라이드(선택).
+        tool_token_limit_before_evict: tool 결과를 파일 시스템으로 축출(evict)하기 전 토큰 제한(선택).
 
     Example:
         ```python
@@ -823,14 +820,14 @@ class FilesystemMiddleware(AgentMiddleware):
         from deepagents.backends import StateBackend, StoreBackend, CompositeBackend
         from langchain.agents import create_agent
 
-        # Ephemeral storage only (default, no execution)
+        # 일시적 저장만 사용(기본값, 실행 도구 없음)
         agent = create_agent(middleware=[FilesystemMiddleware()])
 
-        # With hybrid storage (ephemeral + persistent /memories/)
+        # 하이브리드 저장(일시적 + /memories/ 영구 저장)
         backend = CompositeBackend(default=StateBackend(), routes={"/memories/": StoreBackend()})
         agent = create_agent(middleware=[FilesystemMiddleware(backend=backend)])
 
-        # With sandbox backend (supports execution)
+        # 샌드박스 backend(실행 도구 지원)
         from my_sandbox import DockerSandboxBackend
 
         sandbox = DockerSandboxBackend(container_id="my-container")
@@ -848,33 +845,33 @@ class FilesystemMiddleware(AgentMiddleware):
         custom_tool_descriptions: dict[str, str] | None = None,
         tool_token_limit_before_evict: int | None = 20000,
     ) -> None:
-        """Initialize the filesystem middleware.
+        """파일 시스템 미들웨어를 초기화합니다.
 
         Args:
-            backend: Backend for file storage and optional execution, or a factory callable.
-                Defaults to StateBackend if not provided.
-            system_prompt: Optional custom system prompt override.
-            custom_tool_descriptions: Optional custom tool descriptions override.
-            tool_token_limit_before_evict: Optional token limit before evicting a tool result to the filesystem.
+            backend: 파일 저장/실행에 사용할 backend 또는 팩토리 callable.
+                미지정 시 `StateBackend`를 기본값으로 사용합니다.
+            system_prompt: 커스텀 system prompt 오버라이드(선택).
+            custom_tool_descriptions: 도구 설명 오버라이드(선택).
+            tool_token_limit_before_evict: tool 결과를 파일 시스템으로 축출(evict)하기 전 토큰 제한(선택).
         """
         self.tool_token_limit_before_evict = tool_token_limit_before_evict
 
-        # Use provided backend or default to StateBackend factory
+        # backend가 주어지지 않으면 StateBackend 팩토리를 기본값으로 사용
         self.backend = backend if backend is not None else (lambda rt: StateBackend(rt))
 
-        # Set system prompt (allow full override or None to generate dynamically)
+        # system prompt 설정(완전 오버라이드 또는 None이면 동적 생성)
         self._custom_system_prompt = system_prompt
 
         self.tools = _get_filesystem_tools(self.backend, custom_tool_descriptions)
 
     def _get_backend(self, runtime: ToolRuntime) -> BackendProtocol:
-        """Get the resolved backend instance from backend or factory.
+        """백엔드 인스턴스/팩토리로부터 실제 백엔드를 해석(resolve)합니다.
 
         Args:
-            runtime: The tool runtime context.
+            runtime: tool runtime 컨텍스트.
 
         Returns:
-            Resolved backend instance.
+            해석된 backend 인스턴스.
         """
         if callable(self.backend):
             return self.backend(runtime)
@@ -885,38 +882,38 @@ class FilesystemMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelResponse:
-        """Update the system prompt and filter tools based on backend capabilities.
+        """백엔드 capability에 따라 system prompt/도구 목록을 갱신합니다.
 
         Args:
-            request: The model request being processed.
-            handler: The handler function to call with the modified request.
+            request: 처리 중인 모델 요청.
+            handler: 수정된 요청으로 호출할 핸들러 함수.
 
         Returns:
-            The model response from the handler.
+            핸들러가 반환한 모델 응답.
         """
-        # Check if execute tool is present and if backend supports it
+        # execute 도구가 있는지, 그리고 backend가 실행을 지원하는지 확인
         has_execute_tool = any((tool.name if hasattr(tool, "name") else tool.get("name")) == "execute" for tool in request.tools)
 
         backend_supports_execution = False
         if has_execute_tool:
-            # Resolve backend to check execution support
+            # 실행 지원 여부를 확인하기 위해 backend를 해석
             backend = self._get_backend(request.runtime)
             backend_supports_execution = _supports_execution(backend)
 
-            # If execute tool exists but backend doesn't support it, filter it out
+            # execute 도구가 있지만 backend가 지원하지 않으면 tools에서 제거
             if not backend_supports_execution:
                 filtered_tools = [tool for tool in request.tools if (tool.name if hasattr(tool, "name") else tool.get("name")) != "execute"]
                 request = request.override(tools=filtered_tools)
                 has_execute_tool = False
 
-        # Use custom system prompt if provided, otherwise generate dynamically
+        # 커스텀 system prompt가 있으면 사용하고, 없으면 사용 가능한 도구 기준으로 동적 생성
         if self._custom_system_prompt is not None:
             system_prompt = self._custom_system_prompt
         else:
-            # Build dynamic system prompt based on available tools
+            # 사용 가능한 도구에 따라 동적 system prompt 구성
             prompt_parts = [FILESYSTEM_SYSTEM_PROMPT]
 
-            # Add execution instructions if execute tool is available
+            # execute 도구가 가능하면 실행 관련 지침 추가
             if has_execute_tool and backend_supports_execution:
                 prompt_parts.append(EXECUTION_SYSTEM_PROMPT)
 
@@ -932,7 +929,7 @@ class FilesystemMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelResponse:
-        """(async) Update the system prompt and filter tools based on backend capabilities.
+        """(async) backend capability에 따라 system prompt/도구 목록을 갱신합니다.
 
         Args:
             request: The model request being processed.
@@ -979,7 +976,7 @@ class FilesystemMiddleware(AgentMiddleware):
         message: ToolMessage,
         resolved_backend: BackendProtocol,
     ) -> tuple[ToolMessage, dict[str, FileData] | None]:
-        """Process a large ToolMessage by evicting its content to filesystem.
+        """큰 ToolMessage를 처리하며, 콘텐츠를 파일 시스템으로 축출(evict)합니다.
 
         Args:
             message: The ToolMessage with large content to evict.
@@ -999,12 +996,12 @@ class FilesystemMiddleware(AgentMiddleware):
             uncommon in tool results. For simplicity, all content is stringified and evicted.
             The model can recover by reading the offloaded file from the backend.
         """
-        # Early exit if eviction not configured
+        # 축출 설정이 없으면 조기 종료
         if not self.tool_token_limit_before_evict:
             return message, None
 
-        # Convert content to string once for both size check and eviction
-        # Special case: single text block - extract text directly for readability
+        # 크기 체크와 축출을 위해 콘텐츠를 한 번만 문자열로 변환합니다.
+        # 특수 케이스: 단일 텍스트 블록이면 가독성을 위해 텍스트만 추출합니다.
         if (
             isinstance(message.content, list)
             and len(message.content) == 1
@@ -1016,23 +1013,23 @@ class FilesystemMiddleware(AgentMiddleware):
         elif isinstance(message.content, str):
             content_str = message.content
         else:
-            # Multiple blocks or non-text content - stringify entire structure
+            # 여러 블록 또는 텍스트가 아닌 콘텐츠: 전체 구조를 문자열로 변환
             content_str = str(message.content)
 
-        # Check if content exceeds eviction threshold
-        # Using 4 chars per token as a conservative approximation (actual ratio varies by content)
-        # This errs on the high side to avoid premature eviction of content that might fit
+        # 콘텐츠가 축출 임계치를 초과하는지 확인
+        # token당 4 chars로 보수적으로 추정합니다(실제 비율은 콘텐츠에 따라 달라짐).
+        # 실제로는 들어갈 수 있는 콘텐츠를 너무 일찍 축출하지 않도록 “높게” 잡는 쪽으로 동작합니다.
         if len(content_str) <= 4 * self.tool_token_limit_before_evict:
             return message, None
 
-        # Write content to filesystem
+        # 콘텐츠를 파일 시스템에 기록
         sanitized_id = sanitize_tool_call_id(message.tool_call_id)
         file_path = f"/large_tool_results/{sanitized_id}"
         result = resolved_backend.write(file_path, content_str)
         if result.error:
             return message, None
 
-        # Create truncated preview for the replacement message
+        # 대체 메시지에 넣을 미리보기(트렁케이트) 생성
         content_sample = format_content_with_line_numbers([line[:1000] for line in content_str.splitlines()[:10]], start_line=1)
         replacement_text = TOO_LARGE_TOOL_MSG.format(
             tool_call_id=message.tool_call_id,
@@ -1040,7 +1037,7 @@ class FilesystemMiddleware(AgentMiddleware):
             content_sample=content_sample,
         )
 
-        # Always return as plain string after eviction
+        # 축출 후에는 항상 plain string ToolMessage로 반환
         processed_message = ToolMessage(
             content=replacement_text,
             tool_call_id=message.tool_call_id,
@@ -1048,7 +1045,7 @@ class FilesystemMiddleware(AgentMiddleware):
         return processed_message, result.files_update
 
     def _intercept_large_tool_result(self, tool_result: ToolMessage | Command, runtime: ToolRuntime) -> ToolMessage | Command:
-        """Intercept and process large tool results before they're added to state.
+        """state에 추가되기 전에 큰 tool result를 가로채서 처리합니다.
 
         Args:
             tool_result: The tool result to potentially evict (ToolMessage or Command).
@@ -1108,7 +1105,7 @@ class FilesystemMiddleware(AgentMiddleware):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        """Check the size of the tool call result and evict to filesystem if too large.
+        """도구 호출(tool call) 결과 크기를 확인하고, 너무 크면 파일 시스템으로 축출(evict)합니다.
 
         Args:
             request: The tool call request being processed.
@@ -1128,7 +1125,7 @@ class FilesystemMiddleware(AgentMiddleware):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        """(async)Check the size of the tool call result and evict to filesystem if too large.
+        """(async) tool call 결과 크기를 확인하고, 너무 크면 파일 시스템으로 축출(evict)합니다.
 
         Args:
             request: The tool call request being processed.

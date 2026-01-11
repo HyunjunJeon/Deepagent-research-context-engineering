@@ -12,6 +12,8 @@ All tests run on a single sandbox instance (class-scoped fixture)
 to avoid the overhead of spinning up multiple containers.
 """
 
+# ruff: noqa: S108
+
 from collections.abc import Iterator
 
 import pytest
@@ -79,7 +81,11 @@ class TestSandboxOperations:
     def test_write_special_characters(self, sandbox: SandboxBackendProtocol) -> None:
         """Test writing content with special characters and escape sequences."""
         test_path = "/tmp/test_sandbox_ops/special.txt"
-        content = "Special chars: $VAR, `command`, $(subshell), 'quotes', \"quotes\"\nTab\there\nBackslash: \\"
+        content = (
+            "Special chars: $VAR, `command`, $(subshell), 'quotes', \"quotes\"\n"
+            "Tab\there\n"
+            "Backslash: \\"
+        )
 
         result = sandbox.write(test_path, content)
 
@@ -238,7 +244,11 @@ class TestSandboxOperations:
     def test_read_unicode_content(self, sandbox: SandboxBackendProtocol) -> None:
         """Test reading a file with unicode content."""
         test_path = "/tmp/test_sandbox_ops/unicode_read.txt"
-        content = "Hello 👋 世界\nПривет мир\nمرحبا العالم"
+        content = (
+            "Hello 👋 世界\n"
+            "\u041f\u0440\u0438\u0432\u0435\u0442 \u043c\u0438\u0440\n"
+            "\u0645\u0631\u062d\u0628\u0627 \u0627\u0644\u0639\u0627\u0644\u0645"
+        )
         sandbox.write(test_path, content)
 
         result = sandbox.read(test_path)
@@ -734,7 +744,10 @@ class TestSandboxOperations:
         """Test grep with unicode pattern and content."""
         base_dir = "/tmp/test_sandbox_ops/grep_unicode"
         sandbox.execute(f"mkdir -p {base_dir}")
-        sandbox.write(f"{base_dir}/unicode.txt", "Hello 世界\nПривет мир\n测试 pattern")
+        sandbox.write(
+            f"{base_dir}/unicode.txt",
+            "Hello 世界\n\u041f\u0440\u0438\u0432\u0435\u0442 \u043c\u0438\u0440\n测试 pattern",
+        )
 
         result = sandbox.grep_raw("世界", path=base_dir)
 

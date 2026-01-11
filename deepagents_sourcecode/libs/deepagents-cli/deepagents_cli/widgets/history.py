@@ -1,4 +1,4 @@
-"""Command history manager for input persistence."""
+"""입력 히스토리를 파일로 지속(persist)하기 위한 커맨드 히스토리 관리자입니다."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ from pathlib import Path  # noqa: TC003 - used at runtime in type hints
 
 
 class HistoryManager:
-    """Manages command history with file persistence.
+    """파일 지속을 포함한 커맨드 히스토리를 관리합니다.
 
     Uses append-only writes for concurrent safety. Multiple agents can
     safely write to the same history file without corruption.
     """
 
     def __init__(self, history_file: Path, max_entries: int = 100) -> None:
-        """Initialize the history manager.
+        """히스토리 관리자를 초기화합니다.
 
         Args:
             history_file: Path to the JSON-lines history file
@@ -28,7 +28,7 @@ class HistoryManager:
         self._load_history()
 
     def _load_history(self) -> None:
-        """Load history from file."""
+        """파일에서 히스토리를 로드합니다."""
         if not self.history_file.exists():
             return
 
@@ -49,7 +49,7 @@ class HistoryManager:
             self._entries = []
 
     def _append_to_file(self, text: str) -> None:
-        """Append a single entry to history file (concurrent-safe)."""
+        """히스토리 파일에 항목 하나를 append 합니다(concurrent-safe)."""
         try:
             self.history_file.parent.mkdir(parents=True, exist_ok=True)
             with self.history_file.open("a", encoding="utf-8") as f:
@@ -58,7 +58,7 @@ class HistoryManager:
             pass
 
     def _compact_history(self) -> None:
-        """Rewrite history file to remove old entries.
+        """오래된 항목을 제거하기 위해 히스토리 파일을 재작성합니다.
 
         Only called when entries exceed 2x max_entries to minimize rewrites.
         """
@@ -71,26 +71,26 @@ class HistoryManager:
             pass
 
     def add(self, text: str) -> None:
-        """Add a command to history.
+        """커맨드를 히스토리에 추가합니다.
 
         Args:
             text: The command text to add
         """
         text = text.strip()
-        # Skip empty or slash commands
+        # 빈 문자열 또는 slash 커맨드는 스킵
         if not text or text.startswith("/"):
             return
 
-        # Skip duplicates of the last entry
+        # 직전 항목과 중복이면 스킵
         if self._entries and self._entries[-1] == text:
             return
 
         self._entries.append(text)
 
-        # Append to file (fast, concurrent-safe)
+        # 파일에 append(빠르고 concurrent-safe)
         self._append_to_file(text)
 
-        # Compact only when we have 2x max entries (rare operation)
+        # 엔트리가 2배를 초과할 때만 compact(드문 작업)
         if len(self._entries) > self.max_entries * 2:
             self._entries = self._entries[-self.max_entries :]
             self._compact_history()
@@ -98,7 +98,7 @@ class HistoryManager:
         self.reset_navigation()
 
     def get_previous(self, current_input: str, prefix: str = "") -> str | None:
-        """Get the previous history entry.
+        """이전 히스토리 항목을 가져옵니다.
 
         Args:
             current_input: Current input text (saved on first navigation)
@@ -110,12 +110,12 @@ class HistoryManager:
         if not self._entries:
             return None
 
-        # Save current input on first navigation
+        # 첫 네비게이션 시 현재 입력을 저장
         if self._current_index == -1:
             self._temp_input = current_input
             self._current_index = len(self._entries)
 
-        # Search backwards for matching entry
+        # 뒤로 탐색하며 prefix에 매칭되는 항목을 찾음
         for i in range(self._current_index - 1, -1, -1):
             if self._entries[i].startswith(prefix):
                 self._current_index = i
@@ -124,7 +124,7 @@ class HistoryManager:
         return None
 
     def get_next(self, prefix: str = "") -> str | None:
-        """Get the next history entry.
+        """다음 히스토리 항목을 가져옵니다.
 
         Args:
             prefix: Optional prefix to filter entries
@@ -135,18 +135,18 @@ class HistoryManager:
         if self._current_index == -1:
             return None
 
-        # Search forwards for matching entry
+        # 앞으로 탐색하며 prefix에 매칭되는 항목을 찾음
         for i in range(self._current_index + 1, len(self._entries)):
             if self._entries[i].startswith(prefix):
                 self._current_index = i
                 return self._entries[i]
 
-        # Return to original input at the end
+        # 끝까지 가면 원래 입력으로 복귀
         result = self._temp_input
         self.reset_navigation()
         return result
 
     def reset_navigation(self) -> None:
-        """Reset navigation state."""
+        """네비게이션 상태를 초기화합니다."""
         self._current_index = -1
         self._temp_input = ""

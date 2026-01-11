@@ -1,4 +1,4 @@
-"""DeepAgents ACP server implementation."""
+"""DeepAgents ACP 서버 구현입니다."""
 
 from __future__ import annotations
 
@@ -7,38 +7,40 @@ import uuid
 from typing import Any, Literal
 
 from acp import (
+    PROTOCOL_VERSION,
     Agent,
     AgentSideConnection,
-    PROTOCOL_VERSION,
     stdio_streams,
 )
 from acp.schema import (
     AgentMessageChunk,
+    AgentPlanUpdate,
+    AgentThoughtChunk,
+    AllowedOutcome,
+    CancelNotification,
+    ContentToolCallContent,
+    DeniedOutcome,
+    Implementation,
     InitializeRequest,
     InitializeResponse,
+    LoadSessionRequest,
+    LoadSessionResponse,
     NewSessionRequest,
     NewSessionResponse,
+    PermissionOption,
+    PlanEntry,
     PromptRequest,
     PromptResponse,
-    SessionNotification,
-    TextContentBlock,
-    Implementation,
-    AgentThoughtChunk,
-    ToolCallProgress,
-    ContentToolCallContent,
-    LoadSessionResponse,
-    SetSessionModeResponse,
-    SetSessionModelResponse,
-    CancelNotification,
-    LoadSessionRequest,
-    SetSessionModeRequest,
-    SetSessionModelRequest,
-    AgentPlanUpdate,
-    PlanEntry,
-    PermissionOption,
     RequestPermissionRequest,
-    AllowedOutcome,
-    DeniedOutcome,
+    SessionNotification,
+    SetSessionModelRequest,
+    SetSessionModelResponse,
+    SetSessionModeRequest,
+    SetSessionModeResponse,
+    TextContentBlock,
+    ToolCallProgress,
+)
+from acp.schema import (
     ToolCall as ACPToolCall,
 )
 from deepagents import create_deep_agent
@@ -52,14 +54,14 @@ from langgraph.types import Command, Interrupt
 
 
 class DeepagentsACP(Agent):
-    """ACP Agent implementation wrapping deepagents."""
+    """deepagents를 감싼 ACP Agent 구현체입니다."""
 
     def __init__(
         self,
         connection: AgentSideConnection,
         agent_graph: CompiledStateGraph,
     ) -> None:
-        """Initialize the DeepAgents agent.
+        """DeepAgents 에이전트를 초기화합니다.
 
         Args:
             connection: The ACP connection for communicating with the client
@@ -68,15 +70,15 @@ class DeepagentsACP(Agent):
         self._connection = connection
         self._agent_graph = agent_graph
         self._sessions: dict[str, dict[str, Any]] = {}
-        # Track tool calls by ID for matching with ToolMessages
-        # Maps tool_call_id -> ToolCall TypedDict
+        # ToolMessage와 매칭하기 위해 tool_call_id별 tool call을 추적합니다.
+        # tool_call_id -> ToolCall TypedDict
         self._tool_calls: dict[str, ToolCall] = {}
 
     async def initialize(
         self,
         params: InitializeRequest,
     ) -> InitializeResponse:
-        """Initialize the agent and return capabilities."""
+        """에이전트를 초기화하고 capabilities를 반환합니다."""
         return InitializeResponse(
             protocolVersion=PROTOCOL_VERSION,
             agentInfo=Implementation(
@@ -90,7 +92,7 @@ class DeepagentsACP(Agent):
         self,
         params: NewSessionRequest,
     ) -> NewSessionResponse:
-        """Create a new session with a deepagents instance."""
+        """DeepAgents 인스턴스로 새 세션을 생성합니다."""
         session_id = str(uuid.uuid4())
         # Store session state with the shared agent graph
         self._sessions[session_id] = {
@@ -105,7 +107,7 @@ class DeepagentsACP(Agent):
         params: PromptRequest,
         message: AIMessageChunk,
     ) -> None:
-        """Handle an AIMessageChunk and send appropriate notifications.
+        """AIMessageChunk를 처리하고 적절한 알림(notification)을 전송합니다.
 
         Args:
             params: The prompt request parameters
@@ -159,7 +161,7 @@ class DeepagentsACP(Agent):
         params: PromptRequest,
         message: AIMessage,
     ) -> None:
-        """Handle completed tool calls from an AIMessage and send notifications.
+        """AIMessage의 완료된 tool call을 처리하고 알림(notification)을 전송합니다.
 
         Args:
             params: The prompt request parameters
@@ -214,7 +216,7 @@ class DeepagentsACP(Agent):
         tool_call: ToolCall,
         message: ToolMessage,
     ) -> None:
-        """Handle a ToolMessage and send appropriate notifications.
+        """ToolMessage를 처리하고 적절한 알림(notification)을 전송합니다.
 
         Args:
             params: The prompt request parameters
@@ -264,7 +266,7 @@ class DeepagentsACP(Agent):
         params: PromptRequest,
         todos: list[dict[str, Any]],
     ) -> None:
-        """Handle todo list updates from the tools node.
+        """Tools node에서 발생한 todo list 업데이트를 처리합니다.
 
         Args:
             params: The prompt request parameters
@@ -309,7 +311,7 @@ class DeepagentsACP(Agent):
         params: PromptRequest,
         interrupt: Interrupt,
     ) -> list[dict[str, Any]]:
-        """Handle a LangGraph interrupt and request permission from the client.
+        """LangGraph interrupt를 처리하고 클라이언트에 권한을 요청합니다.
 
         Args:
             params: The prompt request parameters
@@ -423,7 +425,7 @@ class DeepagentsACP(Agent):
         stream_input: dict[str, Any] | Command,
         config: dict[str, Any],
     ) -> list[Interrupt]:
-        """Stream agent execution and handle updates, returning any interrupts.
+        """에이전트 실행을 스트리밍하고 업데이트를 처리하며, interrupt가 있으면 반환합니다.
 
         Args:
             params: The prompt request parameters
@@ -496,7 +498,7 @@ class DeepagentsACP(Agent):
         self,
         params: PromptRequest,
     ) -> PromptResponse:
-        """Handle a user prompt and stream responses."""
+        """사용자 프롬프트를 처리하고 응답을 스트리밍합니다."""
         session_id = params.sessionId
         session = self._sessions.get(session_id)
 
@@ -541,50 +543,50 @@ class DeepagentsACP(Agent):
         return PromptResponse(stopReason="end_turn")
 
     async def authenticate(self, params: Any) -> Any | None:
-        """Authenticate (optional)."""
-        # Authentication not required for now
+        """인증 처리(선택)."""
+        # 현재는 인증이 필요하지 않습니다.
         return None
 
     async def extMethod(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
-        """Handle extension methods (optional)."""
+        """Extension method 처리(선택)."""
         raise NotImplementedError(f"Extension method {method} not supported")
 
     async def extNotification(self, method: str, params: dict[str, Any]) -> None:
-        """Handle extension notifications (optional)."""
+        """Extension notification 처리(선택)."""
         pass
 
     async def cancel(self, params: CancelNotification) -> None:
-        """Cancel a running session."""
-        # TODO: Implement cancellation logic
+        """실행 중인 세션을 취소합니다."""
+        # TODO: 취소 로직 구현
         pass
 
     async def loadSession(
         self,
         params: LoadSessionRequest,
     ) -> LoadSessionResponse | None:
-        """Load an existing session (optional)."""
-        # Not implemented yet - would need to serialize/deserialize session state
+        """기존 세션 로드(선택)."""
+        # 미구현: 세션 state의 serialize/deserialize가 필요합니다.
         return None
 
     async def setSessionMode(
         self,
         params: SetSessionModeRequest,
     ) -> SetSessionModeResponse | None:
-        """Set session mode (optional)."""
-        # Could be used to switch between different agent modes
+        """세션 모드 설정(선택)."""
+        # 다른 agent mode로 전환하는 용도로 사용할 수 있습니다.
         return None
 
     async def setSessionModel(
         self,
         params: SetSessionModelRequest,
     ) -> SetSessionModelResponse | None:
-        """Set session model (optional)."""
-        # Not supported - model is configured at agent graph creation time
+        """세션 모델 설정(선택)."""
+        # 미지원: 모델은 agent graph 생성 시점에 고정됩니다.
         return None
 
 
 async def main() -> None:
-    """Main entry point for running the ACP server."""
+    """ACP 서버 실행용 메인 엔트리포인트입니다."""
     # from deepagents_cli.agent import create_agent_with_config
     # from deepagents_cli.config import create_model
     # from deepagents_cli.tools import fetch_url, http_request, web_search
@@ -647,7 +649,7 @@ async def main() -> None:
 
 
 def cli_main() -> None:
-    """Synchronous CLI entry point for the ACP server."""
+    """ACP 서버 실행용 동기 CLI 엔트리포인트입니다."""
     asyncio.run(main())
 
 

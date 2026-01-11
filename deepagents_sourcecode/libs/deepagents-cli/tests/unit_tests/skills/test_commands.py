@@ -70,7 +70,7 @@ class TestValidateSkillName:
             "/etc/passwd",
             "/home/user/.ssh",
             "\\Windows\\System32",
-            "/tmp/exploit",
+            "/tmp/exploit",  # noqa: S108
         ]
         for name in malicious_names:
             is_valid, error = _validate_name(name)

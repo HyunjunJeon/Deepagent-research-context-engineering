@@ -6,6 +6,10 @@ Searches the arXiv preprint repository for research papers.
 
 import argparse
 
+from rich.console import Console
+
+console = Console()
+
 
 def query_arxiv(query: str, max_papers: int = 10) -> str:
     """Query arXiv for papers based on the provided search query.
@@ -33,12 +37,16 @@ def query_arxiv(query: str, max_papers: int = 10) -> str:
         results = "\n\n".join(
             [f"Title: {paper.title}\nSummary: {paper.summary}" for paper in client.results(search)]
         )
-        return results if results else "No papers found on arXiv."
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return f"Error querying arXiv: {e}"
+    else:
+        if results:
+            return results
+        return "No papers found on arXiv."
 
 
 def main() -> None:
+    """Run the arXiv search CLI."""
     parser = argparse.ArgumentParser(description="Search arXiv for research papers")
     parser.add_argument("query", type=str, help="Search query string")
     parser.add_argument(
@@ -50,7 +58,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    query_arxiv(args.query, max_papers=args.max_papers)
+    console.print(query_arxiv(args.query, max_papers=args.max_papers))
 
 
 if __name__ == "__main__":

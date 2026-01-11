@@ -1,4 +1,7 @@
-"""Textual UI adapter for agent execution."""
+"""에이전트 실행을 Textual UI에 연결하는 어댑터입니다.
+
+Textual UI adapter for agent execution.
+"""
 # ruff: noqa: PLR0912, PLR0915, ANN401, PLR2004, BLE001, TRY203
 # This module has complex streaming logic ported from execution.py
 
@@ -498,7 +501,8 @@ async def execute_task_textual(
                             elif isinstance(decision, dict) and decision.get("type") == "reject":
                                 if tool_msg:
                                     tool_msg.set_rejected()
-                                # Only remove from tracking on reject (approved tools need output update)
+                                # Only remove from tracking on reject
+                                # (approved tools need output update).
                                 if tool_msg_key and tool_msg_key in adapter._current_tool_messages:
                                     del adapter._current_tool_messages[tool_msg_key]
 

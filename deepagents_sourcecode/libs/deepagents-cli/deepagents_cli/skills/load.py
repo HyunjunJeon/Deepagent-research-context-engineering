@@ -1,4 +1,4 @@
-"""Skill loader for CLI commands.
+"""CLI 커맨드용 스킬 로더(파일시스템 기반)입니다.
 
 This module provides filesystem-based skill loading for CLI operations (list, create, info).
 It wraps the prebuilt middleware functionality from deepagents.middleware.skills and adapts
@@ -9,11 +9,14 @@ For middleware usage within agents, use deepagents.middleware.skills.SkillsMiddl
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from deepagents.backends.filesystem import FilesystemBackend
 from deepagents.middleware.skills import SkillMetadata
 from deepagents.middleware.skills import _list_skills as list_skills_from_backend
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class ExtendedSkillMetadata(SkillMetadata):

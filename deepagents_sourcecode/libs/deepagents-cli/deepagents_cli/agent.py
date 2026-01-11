@@ -1,4 +1,6 @@
-"""Agent management and creation for the CLI."""
+"""deepagents-cli에서 에이전트를 생성하고 관리하는 로직입니다."""
+
+# ruff: noqa: E501
 
 import os
 import shutil
@@ -25,9 +27,11 @@ from deepagents_cli.config import COLORS, config, console, get_default_coding_in
 from deepagents_cli.integrations.sandbox_factory import get_default_working_dir
 from deepagents_cli.shell import ShellMiddleware
 
+DESCRIPTION_PREVIEW_LIMIT = 500
+
 
 def list_agents() -> None:
-    """List all available agents."""
+    """사용 가능한 모든 에이전트를 나열합니다."""
     agents_dir = settings.user_deepagents_dir
 
     if not agents_dir.exists() or not any(agents_dir.iterdir()):
@@ -58,7 +62,7 @@ def list_agents() -> None:
 
 
 def reset_agent(agent_name: str, source_agent: str | None = None) -> None:
-    """Reset an agent to default or copy from another agent."""
+    """에이전트를 기본값으로 리셋하거나 다른 에이전트 설정을 복사합니다."""
     agents_dir = settings.user_deepagents_dir
     agent_dir = agents_dir / agent_name
 
@@ -92,7 +96,7 @@ def reset_agent(agent_name: str, source_agent: str | None = None) -> None:
 
 
 def get_system_prompt(assistant_id: str, sandbox_type: str | None = None) -> str:
-    """Get the base system prompt for the agent.
+    """에이전트의 기본 system prompt를 생성합니다.
 
     Args:
         assistant_id: The agent identifier for path references
@@ -190,7 +194,7 @@ The todo list is a planning tool - use it judiciously to avoid overwhelming the 
 def _format_write_file_description(
     tool_call: ToolCall, _state: AgentState, _runtime: Runtime
 ) -> str:
-    """Format write_file tool call for approval prompt."""
+    """승인 프롬프트에 표시할 `write_file` 도구 호출 설명을 포맷팅합니다."""
     args = tool_call["args"]
     file_path = args.get("file_path", "unknown")
     content = args.get("content", "")
@@ -204,7 +208,7 @@ def _format_write_file_description(
 def _format_edit_file_description(
     tool_call: ToolCall, _state: AgentState, _runtime: Runtime
 ) -> str:
-    """Format edit_file tool call for approval prompt."""
+    """승인 프롬프트에 표시할 `edit_file` 도구 호출 설명을 포맷팅합니다."""
     args = tool_call["args"]
     file_path = args.get("file_path", "unknown")
     replace_all = bool(args.get("replace_all", False))
@@ -218,7 +222,7 @@ def _format_edit_file_description(
 def _format_web_search_description(
     tool_call: ToolCall, _state: AgentState, _runtime: Runtime
 ) -> str:
-    """Format web_search tool call for approval prompt."""
+    """승인 프롬프트에 표시할 `web_search` 도구 호출 설명을 포맷팅합니다."""
     args = tool_call["args"]
     query = args.get("query", "unknown")
     max_results = args.get("max_results", 5)
@@ -229,7 +233,7 @@ def _format_web_search_description(
 def _format_fetch_url_description(
     tool_call: ToolCall, _state: AgentState, _runtime: Runtime
 ) -> str:
-    """Format fetch_url tool call for approval prompt."""
+    """승인 프롬프트에 표시할 `fetch_url` 도구 호출 설명을 포맷팅합니다."""
     args = tool_call["args"]
     url = args.get("url", "unknown")
     timeout = args.get("timeout", 30)
@@ -238,7 +242,7 @@ def _format_fetch_url_description(
 
 
 def _format_task_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
-    """Format task (subagent) tool call for approval prompt.
+    """승인 프롬프트에 표시할 `task`(서브에이전트) 도구 호출 설명을 포맷팅합니다.
 
     The task tool signature is: task(description: str, subagent_type: str)
     The description contains all instructions that will be sent to the subagent.
@@ -249,8 +253,8 @@ def _format_task_description(tool_call: ToolCall, _state: AgentState, _runtime: 
 
     # Truncate description if too long for display
     description_preview = description
-    if len(description) > 500:
-        description_preview = description[:500] + "..."
+    if len(description) > DESCRIPTION_PREVIEW_LIMIT:
+        description_preview = description[:DESCRIPTION_PREVIEW_LIMIT] + "..."
 
     return (
         f"Subagent Type: {subagent_type}\n\n"
@@ -263,21 +267,21 @@ def _format_task_description(tool_call: ToolCall, _state: AgentState, _runtime: 
 
 
 def _format_shell_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
-    """Format shell tool call for approval prompt."""
+    """승인 프롬프트에 표시할 `shell` 도구 호출 설명을 포맷팅합니다."""
     args = tool_call["args"]
     command = args.get("command", "N/A")
     return f"Shell Command: {command}\nWorking Directory: {Path.cwd()}"
 
 
 def _format_execute_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
-    """Format execute tool call for approval prompt."""
+    """승인 프롬프트에 표시할 `execute` 도구 호출 설명을 포맷팅합니다."""
     args = tool_call["args"]
     command = args.get("command", "N/A")
     return f"Execute Command: {command}\nLocation: Remote Sandbox"
 
 
 def _add_interrupt_on() -> dict[str, InterruptOnConfig]:
-    """Configure human-in-the-loop interrupt_on settings for destructive tools."""
+    """파괴적인 도구에 대한 HITL(Human-In-The-Loop) interrupt_on 설정을 구성합니다."""
     shell_interrupt_config: InterruptOnConfig = {
         "allowed_decisions": ["approve", "reject"],
         "description": _format_shell_description,
@@ -337,7 +341,7 @@ def create_cli_agent(
     enable_shell: bool = True,
     checkpointer: BaseCheckpointSaver | None = None,
 ) -> tuple[Pregel, CompositeBackend]:
-    """Create a CLI-configured agent with flexible options.
+    """옵션을 유연하게 조합할 수 있는 CLI용 에이전트를 생성합니다.
 
     This is the main entry point for creating a deepagents CLI agent, usable both
     internally and from external code (e.g., benchmarking frameworks, Harbor).
@@ -442,12 +446,7 @@ def create_cli_agent(
         system_prompt = get_system_prompt(assistant_id=assistant_id, sandbox_type=sandbox_type)
 
     # Configure interrupt_on based on auto_approve setting
-    if auto_approve:
-        # No interrupts - all tools run automatically
-        interrupt_on = {}
-    else:
-        # Full HITL for destructive operations
-        interrupt_on = _add_interrupt_on()
+    interrupt_on = {} if auto_approve else _add_interrupt_on()
 
     composite_backend = CompositeBackend(
         default=backend,

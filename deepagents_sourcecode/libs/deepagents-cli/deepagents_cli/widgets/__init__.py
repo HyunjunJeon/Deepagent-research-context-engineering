@@ -1,4 +1,7 @@
-"""Textual widgets for deepagents-cli."""
+"""deepagents-cli에서 사용하는 Textual 위젯 모음입니다.
+
+Textual widgets for deepagents-cli.
+"""
 
 from __future__ import annotations
 

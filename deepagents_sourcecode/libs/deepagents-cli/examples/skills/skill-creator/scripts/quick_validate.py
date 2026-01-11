@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Quick validation script for skills - minimal version
+"""Quick validation script for skills - minimal version.
 
 For deepagents CLI, skills are located at:
 ~/.deepagents/<agent>/skills/<skill-name>/
@@ -9,28 +8,36 @@ Example:
  python quick_validate.py ~/.deepagents/agent/skills/my-skill
 """
 
-import sys
-import os
 import re
-import yaml
+import sys
 from pathlib import Path
 
-def validate_skill(skill_path):
-    """Basic validation of a skill"""
+import yaml
+from rich.console import Console
+
+console = Console()
+
+MAX_NAME_LENGTH = 64
+MAX_DESCRIPTION_LENGTH = 1024
+EXPECTED_ARG_COUNT = 2
+
+
+def validate_skill(skill_path: str | Path) -> tuple[bool, str]:  # noqa: PLR0911, PLR0912
+    """Basic validation of a skill."""
     skill_path = Path(skill_path)
 
     # Check SKILL.md exists
-    skill_md = skill_path / 'SKILL.md'
+    skill_md = skill_path / "SKILL.md"
     if not skill_md.exists():
         return False, "SKILL.md not found"
 
     # Read and validate frontmatter
     content = skill_md.read_text()
-    if not content.startswith('---'):
+    if not content.startswith("---"):
         return False, "No YAML frontmatter found"
 
     # Extract frontmatter
-    match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
+    match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
     if not match:
         return False, "Invalid frontmatter format"
 
@@ -45,57 +52,67 @@ def validate_skill(skill_path):
         return False, f"Invalid YAML in frontmatter: {e}"
 
     # Define allowed properties
-    ALLOWED_PROPERTIES = {'name', 'description', 'license', 'allowed-tools', 'metadata'}
+    allowed_properties = {"name", "description", "license", "allowed-tools", "metadata"}
 
     # Check for unexpected properties (excluding nested keys under metadata)
-    unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES
+    unexpected_keys = set(frontmatter.keys()) - allowed_properties
     if unexpected_keys:
         return False, (
             f"Unexpected key(s) in SKILL.md frontmatter: {', '.join(sorted(unexpected_keys))}. "
-            f"Allowed properties are: {', '.join(sorted(ALLOWED_PROPERTIES))}"
+            f"Allowed properties are: {', '.join(sorted(allowed_properties))}"
         )
 
     # Check required fields
-    if 'name' not in frontmatter:
+    if "name" not in frontmatter:
         return False, "Missing 'name' in frontmatter"
-    if 'description' not in frontmatter:
+    if "description" not in frontmatter:
         return False, "Missing 'description' in frontmatter"
 
     # Extract name for validation
-    name = frontmatter.get('name', '')
+    name = frontmatter.get("name", "")
     if not isinstance(name, str):
         return False, f"Name must be a string, got {type(name).__name__}"
     name = name.strip()
     if name:
         # Check naming convention (hyphen-case: lowercase with hyphens)
-        if not re.match(r'^[a-z0-9-]+$', name):
-            return False, f"Name '{name}' should be hyphen-case (lowercase letters, digits, and hyphens only)"
-        if name.startswith('-') or name.endswith('-') or '--' in name:
-            return False, f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
+        if not re.match(r"^[a-z0-9-]+$", name):
+            return False, (
+                f"Name '{name}' should be hyphen-case (lowercase letters, digits, and hyphens only)"
+            )
+        if name.startswith("-") or name.endswith("-") or "--" in name:
+            return False, (
+                f"Name '{name}' cannot start/end with hyphen or contain consecutive hyphens"
+            )
         # Check name length (max 64 characters per spec)
-        if len(name) > 64:
-            return False, f"Name is too long ({len(name)} characters). Maximum is 64 characters."
+        if len(name) > MAX_NAME_LENGTH:
+            return False, (
+                f"Name is too long ({len(name)} characters). "
+                f"Maximum is {MAX_NAME_LENGTH} characters."
+            )
 
     # Extract and validate description
-    description = frontmatter.get('description', '')
+    description = frontmatter.get("description", "")
     if not isinstance(description, str):
         return False, f"Description must be a string, got {type(description).__name__}"
     description = description.strip()
     if description:
         # Check for angle brackets
-        if '<' in description or '>' in description:
+        if "<" in description or ">" in description:
             return False, "Description cannot contain angle brackets (< or >)"
         # Check description length (max 1024 characters per spec)
-        if len(description) > 1024:
-            return False, f"Description is too long ({len(description)} characters). Maximum is 1024 characters."
+        if len(description) > MAX_DESCRIPTION_LENGTH:
+            return False, (
+                "Description is too long "
+                f"({len(description)} characters). Maximum is {MAX_DESCRIPTION_LENGTH} characters."
+            )
 
     return True, "Skill is valid!"
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python quick_validate.py <skill_directory>")
+    if len(sys.argv) != EXPECTED_ARG_COUNT:
+        console.print("Usage: python quick_validate.py <skill_directory>")
         sys.exit(1)
 
     valid, message = validate_skill(sys.argv[1])
-    print(message)
+    console.print(message)
     sys.exit(0 if valid else 1)

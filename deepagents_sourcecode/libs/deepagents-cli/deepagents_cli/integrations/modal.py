@@ -1,4 +1,7 @@
-"""Modal sandbox backend implementation."""
+"""Modal 샌드박스 백엔드 구현입니다.
+
+Modal sandbox backend implementation.
+"""
 
 from __future__ import annotations
 

@@ -16,6 +16,8 @@ from deepagents.backends.sandbox import BaseSandbox
 
 from deepagents_cli.integrations.sandbox_factory import create_sandbox
 
+_SANDBOX_TMP_DIR = "/tmp"  # noqa: S108
+
 
 class BaseSandboxIntegrationTest(ABC):
     """Base class for sandbox integration tests.
@@ -38,7 +40,7 @@ class BaseSandboxIntegrationTest(ABC):
 
     def test_upload_single_file(self, sandbox: SandboxBackendProtocol) -> None:
         """Test uploading a single file."""
-        test_path = "/tmp/test_upload_single.txt"
+        test_path = f"{_SANDBOX_TMP_DIR}/test_upload_single.txt"
         test_content = b"Hello, Sandbox!"
         upload_responses = sandbox.upload_files([(test_path, test_content)])
 
@@ -52,7 +54,7 @@ class BaseSandboxIntegrationTest(ABC):
 
     def test_download_single_file(self, sandbox: SandboxBackendProtocol) -> None:
         """Test downloading a single file."""
-        test_path = "/tmp/test_download_single.txt"
+        test_path = f"{_SANDBOX_TMP_DIR}/test_download_single.txt"
         test_content = b"Download test content"
         # Create file first
         sandbox.upload_files([(test_path, test_content)])
@@ -67,7 +69,7 @@ class BaseSandboxIntegrationTest(ABC):
 
     def test_upload_download_roundtrip(self, sandbox: SandboxBackendProtocol) -> None:
         """Test upload followed by download for data integrity."""
-        test_path = "/tmp/test_roundtrip.txt"
+        test_path = f"{_SANDBOX_TMP_DIR}/test_roundtrip.txt"
         test_content = b"Roundtrip test: special chars \n\t\r\x00"
 
         # Upload
@@ -82,9 +84,9 @@ class BaseSandboxIntegrationTest(ABC):
     def test_upload_multiple_files(self, sandbox: SandboxBackendProtocol) -> None:
         """Test uploading multiple files in a single batch."""
         files = [
-            ("/tmp/test_multi_1.txt", b"Content 1"),
-            ("/tmp/test_multi_2.txt", b"Content 2"),
-            ("/tmp/test_multi_3.txt", b"Content 3"),
+            (f"{_SANDBOX_TMP_DIR}/test_multi_1.txt", b"Content 1"),
+            (f"{_SANDBOX_TMP_DIR}/test_multi_2.txt", b"Content 2"),
+            (f"{_SANDBOX_TMP_DIR}/test_multi_3.txt", b"Content 3"),
         ]
 
         upload_responses = sandbox.upload_files(files)
@@ -97,9 +99,9 @@ class BaseSandboxIntegrationTest(ABC):
     def test_download_multiple_files(self, sandbox: SandboxBackendProtocol) -> None:
         """Test downloading multiple files in a single batch."""
         files = [
-            ("/tmp/test_batch_1.txt", b"Batch 1"),
-            ("/tmp/test_batch_2.txt", b"Batch 2"),
-            ("/tmp/test_batch_3.txt", b"Batch 3"),
+            (f"{_SANDBOX_TMP_DIR}/test_batch_1.txt", b"Batch 1"),
+            (f"{_SANDBOX_TMP_DIR}/test_batch_2.txt", b"Batch 2"),
+            (f"{_SANDBOX_TMP_DIR}/test_batch_3.txt", b"Batch 3"),
         ]
 
         # Upload files first
@@ -118,7 +120,7 @@ class BaseSandboxIntegrationTest(ABC):
     @pytest.mark.skip(reason="Error handling not implemented yet.")
     def test_download_nonexistent_file(self, sandbox: SandboxBackendProtocol) -> None:
         """Test that downloading a non-existent file returns an error."""
-        nonexistent_path = "/tmp/does_not_exist.txt"
+        nonexistent_path = f"{_SANDBOX_TMP_DIR}/does_not_exist.txt"
 
         download_responses = sandbox.download_files([nonexistent_path])
 
@@ -129,7 +131,7 @@ class BaseSandboxIntegrationTest(ABC):
 
     def test_upload_binary_content(self, sandbox: SandboxBackendProtocol) -> None:
         """Test uploading binary content (not valid UTF-8)."""
-        test_path = "/tmp/binary_file.bin"
+        test_path = f"{_SANDBOX_TMP_DIR}/binary_file.bin"
         # Create binary content with all byte values
         test_content = bytes(range(256))
 
@@ -145,8 +147,8 @@ class BaseSandboxIntegrationTest(ABC):
     def test_partial_success_upload(self, sandbox: SandboxBackendProtocol) -> None:
         """Test that batch upload supports partial success."""
         files = [
-            ("/tmp/valid_upload.txt", b"Valid content"),
-            ("/tmp/another_valid.txt", b"Another valid"),
+            (f"{_SANDBOX_TMP_DIR}/valid_upload.txt", b"Valid content"),
+            (f"{_SANDBOX_TMP_DIR}/another_valid.txt", b"Another valid"),
         ]
 
         upload_responses = sandbox.upload_files(files)
@@ -161,12 +163,12 @@ class BaseSandboxIntegrationTest(ABC):
     def test_partial_success_download(self, sandbox: SandboxBackendProtocol) -> None:
         """Test that batch download supports partial success."""
         # Create one valid file
-        valid_path = "/tmp/valid_file.txt"
+        valid_path = f"{_SANDBOX_TMP_DIR}/valid_file.txt"
         valid_content = b"Valid"
         sandbox.upload_files([(valid_path, valid_content)])
 
         # Request both valid and invalid files
-        paths = [valid_path, "/tmp/does_not_exist.txt"]
+        paths = [valid_path, f"{_SANDBOX_TMP_DIR}/does_not_exist.txt"]
         download_responses = sandbox.download_files(paths)
 
         assert len(download_responses) == 2
@@ -175,7 +177,7 @@ class BaseSandboxIntegrationTest(ABC):
         assert download_responses[0].content == valid_content
         assert download_responses[0].error is None
         # Second should fail
-        assert download_responses[1].path == "/tmp/does_not_exist.txt"
+        assert download_responses[1].path == f"{_SANDBOX_TMP_DIR}/does_not_exist.txt"
         assert download_responses[1].content is None
         assert download_responses[1].error is not None
 
@@ -188,10 +190,10 @@ class BaseSandboxIntegrationTest(ABC):
         Expected behavior: download_files should return FileDownloadResponse with
         error='file_not_found' when the requested file doesn't exist.
         """
-        responses = sandbox.download_files(["/tmp/nonexistent_test_file.txt"])
+        responses = sandbox.download_files([f"{_SANDBOX_TMP_DIR}/nonexistent_test_file.txt"])
 
         assert len(responses) == 1
-        assert responses[0].path == "/tmp/nonexistent_test_file.txt"
+        assert responses[0].path == f"{_SANDBOX_TMP_DIR}/nonexistent_test_file.txt"
         assert responses[0].content is None
         assert responses[0].error == "file_not_found"
 
@@ -205,12 +207,12 @@ class BaseSandboxIntegrationTest(ABC):
         error='is_directory' when trying to download a directory as a file.
         """
         # Create a directory
-        sandbox.execute("mkdir -p /tmp/test_directory")
+        sandbox.execute(f"mkdir -p {_SANDBOX_TMP_DIR}/test_directory")
 
-        responses = sandbox.download_files(["/tmp/test_directory"])
+        responses = sandbox.download_files([f"{_SANDBOX_TMP_DIR}/test_directory"])
 
         assert len(responses) == 1
-        assert responses[0].path == "/tmp/test_directory"
+        assert responses[0].path == f"{_SANDBOX_TMP_DIR}/test_directory"
         assert responses[0].content is None
         assert responses[0].error == "is_directory"
 
@@ -229,13 +231,15 @@ class BaseSandboxIntegrationTest(ABC):
         """
         # Try to upload to a path where the parent is a file, not a directory
         # First create a file
-        sandbox.upload_files([("/tmp/parent_is_file.txt", b"I am a file")])
+        sandbox.upload_files([(f"{_SANDBOX_TMP_DIR}/parent_is_file.txt", b"I am a file")])
 
         # Now try to upload as if parent_is_file.txt were a directory
-        responses = sandbox.upload_files([("/tmp/parent_is_file.txt/child.txt", b"child")])
+        responses = sandbox.upload_files(
+            [(f"{_SANDBOX_TMP_DIR}/parent_is_file.txt/child.txt", b"child")]
+        )
 
         assert len(responses) == 1
-        assert responses[0].path == "/tmp/parent_is_file.txt/child.txt"
+        assert responses[0].path == f"{_SANDBOX_TMP_DIR}/parent_is_file.txt/child.txt"
         # Could be parent_not_found or invalid_path depending on implementation
         assert responses[0].error in ("parent_not_found", "invalid_path")
 
@@ -249,10 +253,10 @@ class BaseSandboxIntegrationTest(ABC):
         error='invalid_path' for malformed paths (null bytes, invalid chars, etc).
         """
         # Test with null byte (invalid in most filesystems)
-        responses = sandbox.upload_files([("/tmp/file\x00name.txt", b"content")])
+        responses = sandbox.upload_files([(f"{_SANDBOX_TMP_DIR}/file\x00name.txt", b"content")])
 
         assert len(responses) == 1
-        assert responses[0].path == "/tmp/file\x00name.txt"
+        assert responses[0].path == f"{_SANDBOX_TMP_DIR}/file\x00name.txt"
         assert responses[0].error == "invalid_path"
 
     @pytest.mark.skip(
@@ -265,10 +269,10 @@ class BaseSandboxIntegrationTest(ABC):
         error='invalid_path' for malformed paths (null bytes, invalid chars, etc).
         """
         # Test with null byte (invalid in most filesystems)
-        responses = sandbox.download_files(["/tmp/file\x00name.txt"])
+        responses = sandbox.download_files([f"{_SANDBOX_TMP_DIR}/file\x00name.txt"])
 
         assert len(responses) == 1
-        assert responses[0].path == "/tmp/file\x00name.txt"
+        assert responses[0].path == f"{_SANDBOX_TMP_DIR}/file\x00name.txt"
         assert responses[0].content is None
         assert responses[0].error == "invalid_path"
 
@@ -282,13 +286,13 @@ class BaseSandboxIntegrationTest(ABC):
         an appropriate error. The exact behavior depends on the sandbox provider.
         """
         # Create a directory
-        sandbox.execute("mkdir -p /tmp/test_dir_upload")
+        sandbox.execute(f"mkdir -p {_SANDBOX_TMP_DIR}/test_dir_upload")
 
         # Try to upload a file with the same name as the directory
-        responses = sandbox.upload_files([("/tmp/test_dir_upload", b"file content")])
+        responses = sandbox.upload_files([(f"{_SANDBOX_TMP_DIR}/test_dir_upload", b"file content")])
 
         assert len(responses) == 1
-        assert responses[0].path == "/tmp/test_dir_upload"
+        assert responses[0].path == f"{_SANDBOX_TMP_DIR}/test_dir_upload"
         # Behavior depends on implementation - just verify we get a response
 
 

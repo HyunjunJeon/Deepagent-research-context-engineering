@@ -1,4 +1,4 @@
-"""StateBackend: Store files in LangGraph agent state (ephemeral)."""
+"""StateBackend: LangGraph 에이전트 상태에 파일을 저장합니다(일시적)."""
 
 from typing import TYPE_CHECKING
 
@@ -26,54 +26,54 @@ if TYPE_CHECKING:
 
 
 class StateBackend(BackendProtocol):
-    """Backend that stores files in agent state (ephemeral).
+    """에이전트 상태(state)에 파일을 저장하는 백엔드입니다(일시적).
 
-    Uses LangGraph's state management and checkpointing. Files persist within
-    a conversation thread but not across threads. State is automatically
-    checkpointed after each agent step.
+    LangGraph의 state/checkpoint 메커니즘을 사용합니다. 파일은 동일한 스레드(대화)
+    내에서는 유지되지만, 스레드를 넘어 영구 저장되지는 않습니다. 또한 state는
+    각 에이전트 step 이후 자동으로 checkpoint 됩니다.
 
-    Special handling: Since LangGraph state must be updated via Command objects
-    (not direct mutation), operations return Command objects instead of None.
-    This is indicated by the uses_state=True flag.
+    주의: LangGraph state는 직접 mutation이 아니라 `Command` 객체를 통해 업데이트해야 합니다.
+    따라서 일부 작업은 `None` 대신 `Command`에 적용될 업데이트 정보를 담아 반환합니다.
+    (코드에서는 `uses_state=True` 플래그로 표현)
     """
 
     def __init__(self, runtime: "ToolRuntime"):
-        """Initialize StateBackend with runtime."""
+        """`ToolRuntime`으로 StateBackend를 초기화합니다."""
         self.runtime = runtime
 
     def ls_info(self, path: str) -> list[FileInfo]:
-        """List files and directories in the specified directory (non-recursive).
+        """지정한 디렉토리 바로 아래의 파일/폴더를 나열합니다(비재귀).
 
         Args:
-            path: Absolute path to directory.
+            path: 디렉토리 절대 경로.
 
         Returns:
-            List of FileInfo-like dicts for files and directories directly in the directory.
-            Directories have a trailing / in their path and is_dir=True.
+            해당 디렉토리의 직계 자식 항목에 대한 FileInfo 딕셔너리 리스트.
+            디렉토리는 경로가 `/`로 끝나며 `is_dir=True`입니다.
         """
         files = self.runtime.state.get("files", {})
         infos: list[FileInfo] = []
         subdirs: set[str] = set()
 
-        # Normalize path to have trailing slash for proper prefix matching
+        # prefix 매칭을 위해 trailing slash를 갖는 형태로 정규화
         normalized_path = path if path.endswith("/") else path + "/"
 
         for k, fd in files.items():
-            # Check if file is in the specified directory or a subdirectory
+            # 지정 디렉토리(또는 하위 디렉토리)에 속하는지 확인
             if not k.startswith(normalized_path):
                 continue
 
-            # Get the relative path after the directory
+            # 디렉토리 이후의 상대 경로
             relative = k[len(normalized_path) :]
 
-            # If relative path contains '/', it's in a subdirectory
+            # 상대 경로에 `/`가 있으면 하위 디렉토리에 있는 파일입니다.
             if "/" in relative:
-                # Extract the immediate subdirectory name
+                # 즉시 하위 디렉토리 이름만 추출
                 subdir_name = relative.split("/")[0]
                 subdirs.add(normalized_path + subdir_name + "/")
                 continue
 
-            # This is a file directly in the current directory
+            # 현재 디렉토리 바로 아래에 있는 파일
             size = len("\n".join(fd.get("content", [])))
             infos.append(
                 {
@@ -84,7 +84,7 @@ class StateBackend(BackendProtocol):
                 }
             )
 
-        # Add directories to the results
+        # 디렉토리 항목을 결과에 추가
         for subdir in sorted(subdirs):
             infos.append(
                 {
@@ -104,15 +104,15 @@ class StateBackend(BackendProtocol):
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """Read file content with line numbers.
+        """파일을 읽어 라인 번호가 포함된 문자열로 반환합니다.
 
         Args:
-            file_path: Absolute file path.
-            offset: Line offset to start reading from (0-indexed).
-            limit: Maximum number of lines to read.
+            file_path: 절대 파일 경로.
+            offset: 읽기 시작 라인 오프셋(0-index).
+            limit: 최대 읽기 라인 수.
 
         Returns:
-            Formatted file content with line numbers, or error message.
+            라인 번호가 포함된 포맷 문자열 또는 오류 메시지.
         """
         files = self.runtime.state.get("files", {})
         file_data = files.get(file_path)
@@ -127,8 +127,9 @@ class StateBackend(BackendProtocol):
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """Create a new file with content.
-        Returns WriteResult with files_update to update LangGraph state.
+        """새 파일을 생성합니다.
+
+        LangGraph state 업데이트를 위해 `files_update`가 포함된 `WriteResult`를 반환합니다.
         """
         files = self.runtime.state.get("files", {})
 
@@ -145,8 +146,9 @@ class StateBackend(BackendProtocol):
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """Edit a file by replacing string occurrences.
-        Returns EditResult with files_update and occurrences.
+        """파일 내 문자열을 치환하여 편집합니다.
+
+        `files_update` 및 치환 횟수(`occurrences`)가 포함된 `EditResult`를 반환합니다.
         """
         files = self.runtime.state.get("files", {})
         file_data = files.get(file_path)
@@ -174,7 +176,7 @@ class StateBackend(BackendProtocol):
         return grep_matches_from_files(files, pattern, path, glob)
 
     def glob_info(self, pattern: str, path: str = "/") -> list[FileInfo]:
-        """Get FileInfo for files matching glob pattern."""
+        """Glob 패턴에 매칭되는 파일에 대한 FileInfo를 반환합니다."""
         files = self.runtime.state.get("files", {})
         result = _glob_search_files(files, pattern, path)
         if result == "No files found":
@@ -195,28 +197,14 @@ class StateBackend(BackendProtocol):
         return infos
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """Upload multiple files to state.
-
-        Args:
-            files: List of (path, content) tuples to upload
-
-        Returns:
-            List of FileUploadResponse objects, one per input file
-        """
+        """여러 파일을 state로 업로드합니다."""
         raise NotImplementedError(
             "StateBackend does not support upload_files yet. You can upload files "
             "directly by passing them in invoke if you're storing files in the memory."
         )
 
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """Download multiple files from state.
-
-        Args:
-            paths: List of file paths to download
-
-        Returns:
-            List of FileDownloadResponse objects, one per input path
-        """
+        """여러 파일을 state에서 다운로드합니다."""
         state_files = self.runtime.state.get("files", {})
         responses: list[FileDownloadResponse] = []
 
@@ -227,7 +215,7 @@ class StateBackend(BackendProtocol):
                 responses.append(FileDownloadResponse(path=path, content=None, error="file_not_found"))
                 continue
 
-            # Convert file data to bytes
+            # state의 FileData를 bytes로 변환
             content_str = file_data_to_string(file_data)
             content_bytes = content_str.encode("utf-8")
 

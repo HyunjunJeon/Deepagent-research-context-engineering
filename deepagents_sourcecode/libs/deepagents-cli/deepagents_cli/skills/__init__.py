@@ -1,4 +1,4 @@
-"""Skills module for deepagents CLI.
+"""deepagents CLI에서 스킬(skills) 관리를 위한 모듈입니다.
 
 Public API:
 - execute_skills_command: Execute skills subcommands (list/create/info)

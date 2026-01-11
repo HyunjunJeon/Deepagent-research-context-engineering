@@ -1,4 +1,4 @@
-"""Tool renderers for approval widgets - registry pattern."""
+"""승인(approval) 위젯용 tool renderer들(레지스트리 패턴)입니다."""
 
 from __future__ import annotations
 
@@ -15,14 +15,16 @@ from deepagents_cli.widgets.tool_widgets import (
 if TYPE_CHECKING:
     from deepagents_cli.widgets.tool_widgets import ToolApprovalWidget
 
+DIFF_HEADER_LINES = 2
+
 
 class ToolRenderer:
-    """Base renderer for tool approval widgets."""
+    """tool 승인 위젯 렌더러의 베이스 클래스입니다."""
 
     def get_approval_widget(
         self, tool_args: dict[str, Any]
     ) -> tuple[type[ToolApprovalWidget], dict[str, Any]]:
-        """Get the approval widget class and data for this tool.
+        """이 tool에 대한 승인 위젯 클래스와 데이터를 반환합니다.
 
         Args:
             tool_args: The tool arguments from action_request
@@ -34,16 +36,17 @@ class ToolRenderer:
 
 
 class WriteFileRenderer(ToolRenderer):
-    """Renderer for write_file tool - shows full file content."""
+    """`write_file` tool 렌더러(전체 파일 내용을 표시)."""
 
     def get_approval_widget(
         self, tool_args: dict[str, Any]
     ) -> tuple[type[ToolApprovalWidget], dict[str, Any]]:
-        # Extract file extension for syntax highlighting
+        """`write_file` 요청을 표시할 승인 위젯과 데이터를 구성합니다."""
+        # 문법 하이라이팅을 위해 확장자를 추출
         file_path = tool_args.get("file_path", "")
         content = tool_args.get("content", "")
 
-        # Get file extension
+        # 파일 확장자
         file_extension = "text"
         if "." in file_path:
             file_extension = file_path.rsplit(".", 1)[-1]
@@ -57,16 +60,17 @@ class WriteFileRenderer(ToolRenderer):
 
 
 class EditFileRenderer(ToolRenderer):
-    """Renderer for edit_file tool - shows unified diff."""
+    """`edit_file` tool 렌더러(unified diff 표시)."""
 
     def get_approval_widget(
         self, tool_args: dict[str, Any]
     ) -> tuple[type[ToolApprovalWidget], dict[str, Any]]:
+        """`edit_file` 요청을 unified diff 형태로 표시할 승인 위젯/데이터를 구성합니다."""
         file_path = tool_args.get("file_path", "")
         old_string = tool_args.get("old_string", "")
         new_string = tool_args.get("new_string", "")
 
-        # Generate unified diff
+        # unified diff 생성
         diff_lines = self._generate_diff(old_string, new_string)
 
         data = {
@@ -78,14 +82,14 @@ class EditFileRenderer(ToolRenderer):
         return EditFileApprovalWidget, data
 
     def _generate_diff(self, old_string: str, new_string: str) -> list[str]:
-        """Generate unified diff lines from old and new strings."""
+        """old/new 문자열로부터 unified diff 라인을 생성합니다."""
         if not old_string and not new_string:
             return []
 
         old_lines = old_string.split("\n") if old_string else []
         new_lines = new_string.split("\n") if new_string else []
 
-        # Generate unified diff
+        # unified diff 생성
         diff = difflib.unified_diff(
             old_lines,
             new_lines,
@@ -95,17 +99,18 @@ class EditFileRenderer(ToolRenderer):
             n=3,  # Context lines
         )
 
-        # Skip the first two header lines (--- and +++)
+        # 헤더 라인(---, +++)은 제외
         diff_list = list(diff)
-        return diff_list[2:] if len(diff_list) > 2 else diff_list
+        return diff_list[DIFF_HEADER_LINES:] if len(diff_list) > DIFF_HEADER_LINES else diff_list
 
 
 class BashRenderer(ToolRenderer):
-    """Renderer for bash/shell tool - shows command."""
+    """`bash`/`shell` tool 렌더러(커맨드 표시)."""
 
     def get_approval_widget(
         self, tool_args: dict[str, Any]
     ) -> tuple[type[ToolApprovalWidget], dict[str, Any]]:
+        """`bash`/`shell` 요청을 표시할 승인 위젯/데이터를 구성합니다."""
         data = {
             "command": tool_args.get("command", ""),
             "description": tool_args.get("description", ""),
@@ -113,7 +118,7 @@ class BashRenderer(ToolRenderer):
         return BashApprovalWidget, data
 
 
-# Registry mapping tool names to renderers
+# tool 이름 → renderer 매핑 레지스트리
 _RENDERER_REGISTRY: dict[str, type[ToolRenderer]] = {
     "write_file": WriteFileRenderer,
     "edit_file": EditFileRenderer,
@@ -123,7 +128,7 @@ _RENDERER_REGISTRY: dict[str, type[ToolRenderer]] = {
 
 
 def get_renderer(tool_name: str) -> ToolRenderer:
-    """Get the renderer for a tool by name.
+    """도구 이름에 맞는 renderer를 반환합니다.
 
     Args:
         tool_name: The name of the tool

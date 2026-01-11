@@ -1,4 +1,7 @@
-"""Loading widget with animated spinner for agent activity."""
+"""에이전트 동작 중 표시하는 로딩(스피너) 위젯입니다.
+
+Loading widget with animated spinner for agent activity.
+"""
 
 from __future__ import annotations
 

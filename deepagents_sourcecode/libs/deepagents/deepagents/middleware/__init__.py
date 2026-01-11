@@ -1,4 +1,4 @@
-"""Middleware for the DeepAgent."""
+"""DeepAgent에 사용되는 미들웨어 모듈입니다."""
 
 from deepagents.middleware.filesystem import FilesystemMiddleware
 from deepagents.middleware.memory import MemoryMiddleware

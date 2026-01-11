@@ -1,8 +1,11 @@
-"""UI rendering and display utilities for the CLI."""
+"""CLI UI 렌더링/표시 관련 유틸리티입니다.
+
+UI rendering and display utilities for the CLI.
+"""
 
 import json
+from contextlib import suppress
 from pathlib import Path
-from typing import Any
 
 from .config import COLORS, DEEP_AGENTS_ASCII, MAX_ARG_LENGTH, console
 
@@ -14,7 +17,7 @@ def truncate_value(value: str, max_length: int = MAX_ARG_LENGTH) -> str:
     return value
 
 
-def format_tool_display(tool_name: str, tool_args: dict) -> str:
+def format_tool_display(tool_name: str, tool_args: dict) -> str:  # noqa: PLR0911, PLR0912, PLR0915
     """Format tool calls for display with tool-specific smart formatting.
 
     Shows the most relevant information for each tool type rather than all arguments.
@@ -34,32 +37,32 @@ def format_tool_display(tool_name: str, tool_args: dict) -> str:
 
     def abbreviate_path(path_str: str, max_length: int = 60) -> str:
         """Abbreviate a file path intelligently - show basename or relative path."""
+        path = Path(path_str)
+
+        # If it's just a filename (no directory parts), return as-is
+        if len(path.parts) == 1:
+            return path_str
+
+        # Try to get relative path from current working directory
         try:
-            path = Path(path_str)
+            cwd = Path.cwd()
+        except OSError:
+            cwd = None
 
-            # If it's just a filename (no directory parts), return as-is
-            if len(path.parts) == 1:
-                return path_str
-
-            # Try to get relative path from current working directory
-            try:
-                rel_path = path.relative_to(Path.cwd())
+        if cwd is not None:
+            with suppress(ValueError):
+                rel_path = path.relative_to(cwd)
                 rel_str = str(rel_path)
                 # Use relative if it's shorter and not too long
                 if len(rel_str) < len(path_str) and len(rel_str) <= max_length:
                     return rel_str
-            except (ValueError, Exception):
-                pass
 
-            # If absolute path is reasonable length, use it
-            if len(path_str) <= max_length:
-                return path_str
+        # If absolute path is reasonable length, use it
+        if len(path_str) <= max_length:
+            return path_str
 
-            # Otherwise, just show basename (filename only)
-            return path.name
-        except Exception:
-            # Fallback to original string if any error
-            return truncate_value(path_str, max_length)
+        # Otherwise, just show basename (filename only)
+        return path.name
 
     # Tool-specific formatting - show the most important argument(s)
     if tool_name in ("read_file", "write_file", "edit_file"):
@@ -144,7 +147,7 @@ def format_tool_display(tool_name: str, tool_args: dict) -> str:
     return f"{tool_name}({args_str})"
 
 
-def format_tool_message_content(content: Any) -> str:
+def format_tool_message_content(content: object) -> str:
     """Convert ToolMessage content into a printable string."""
     if content is None:
         return ""
@@ -156,7 +159,7 @@ def format_tool_message_content(content: Any) -> str:
             else:
                 try:
                     parts.append(json.dumps(item))
-                except Exception:
+                except (TypeError, ValueError):
                     parts.append(str(item))
         return "\n".join(parts)
     return str(content)

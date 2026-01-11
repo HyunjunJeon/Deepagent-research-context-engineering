@@ -1,4 +1,4 @@
-"""Middleware for providing subagents to an agent via a `task` tool."""
+"""`task` 도구를 통해 서브에이전트를 제공하는 미들웨어입니다."""
 
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, NotRequired, TypedDict, cast
@@ -15,57 +15,54 @@ from langgraph.types import Command
 
 
 class SubAgent(TypedDict):
-    """Specification for an agent.
+    """서브에이전트 명세(spec)입니다.
 
-    When specifying custom agents, the `default_middleware` from `SubAgentMiddleware`
-    will be applied first, followed by any `middleware` specified in this spec.
-    To use only custom middleware without the defaults, pass `default_middleware=[]`
-    to `SubAgentMiddleware`.
+    커스텀 서브에이전트를 지정할 때, `SubAgentMiddleware`의 `default_middleware`가 먼저 적용되고,
+    그 다음 이 spec의 `middleware`가 뒤에 추가됩니다.
+    기본 미들웨어 없이 커스텀 미들웨어만 사용하려면 `SubAgentMiddleware(default_middleware=[])`로 설정하세요.
     """
 
     name: str
-    """The name of the agent."""
+    """에이전트 이름."""
 
     description: str
-    """The description of the agent."""
+    """에이전트 설명."""
 
     system_prompt: str
-    """The system prompt to use for the agent."""
+    """서브에이전트에 사용할 system prompt."""
 
     tools: Sequence[BaseTool | Callable | dict[str, Any]]
-    """The tools to use for the agent."""
+    """서브에이전트에 제공할 도구 목록."""
 
     model: NotRequired[str | BaseChatModel]
-    """The model for the agent. Defaults to `default_model`."""
+    """서브에이전트 모델(기본값: `default_model`)."""
 
     middleware: NotRequired[list[AgentMiddleware]]
-    """Additional middleware to append after `default_middleware`."""
+    """`default_middleware` 뒤에 추가로 붙일 미들웨어."""
 
     interrupt_on: NotRequired[dict[str, bool | InterruptOnConfig]]
-    """The tool configs to use for the agent."""
+    """서브에이전트에 적용할 tool interrupt 설정."""
 
 
 class CompiledSubAgent(TypedDict):
-    """A pre-compiled agent spec."""
+    """사전 컴파일된(pre-compiled) 서브에이전트 명세입니다."""
 
     name: str
-    """The name of the agent."""
+    """에이전트 이름."""
 
     description: str
-    """The description of the agent."""
+    """에이전트 설명."""
 
     runnable: Runnable
-    """The Runnable to use for the agent."""
+    """서브에이전트 실행에 사용할 `Runnable`."""
 
 
 DEFAULT_SUBAGENT_PROMPT = "In order to complete the objective that the user asks of you, you have access to a number of standard tools."
 
-# State keys that are excluded when passing state to subagents and when returning
-# updates from subagents.
-# When returning updates:
-# 1. The messages key is handled explicitly to ensure only the final message is included
-# 2. The todos and structured_response keys are excluded as they do not have a defined reducer
-#    and no clear meaning for returning them from a subagent to the main agent.
+# 서브에이전트 호출 시 전달하지 않거나, 서브에이전트 결과를 메인으로 되돌릴 때 제외하는 state 키들입니다.
+# 반환 업데이트 처리 시:
+# 1) `messages`는 최종 메시지만 포함되도록 별도로 처리합니다.
+# 2) `todos`, `structured_response`는 reducer가 정의되어 있지 않고 메인 에이전트로 반환할 의미가 불명확하므로 제외합니다.
 _EXCLUDED_STATE_KEYS = {"messages", "todos", "structured_response"}
 
 TASK_TOOL_DESCRIPTION = """Launch an ephemeral subagent to handle complex, multi-step independent tasks with isolated context windows.
@@ -219,29 +216,29 @@ def _get_subagents(
     subagents: list[SubAgent | CompiledSubAgent],
     general_purpose_agent: bool,
 ) -> tuple[dict[str, Any], list[str]]:
-    """Create subagent instances from specifications.
+    """서브에이전트 spec에서 runnable 인스턴스를 생성합니다.
 
     Args:
-        default_model: Default model for subagents that don't specify one.
-        default_tools: Default tools for subagents that don't specify tools.
-        default_middleware: Middleware to apply to all subagents. If `None`,
-            no default middleware is applied.
-        default_interrupt_on: The tool configs to use for the default general-purpose subagent. These
-            are also the fallback for any subagents that don't specify their own tool configs.
-        subagents: List of agent specifications or pre-compiled agents.
-        general_purpose_agent: Whether to include a general-purpose subagent.
+        default_model: 서브에이전트가 별도 모델을 지정하지 않을 때 사용할 기본 모델.
+        default_tools: 서브에이전트가 별도 도구를 지정하지 않을 때 사용할 기본 도구.
+        default_middleware: 모든 서브에이전트에 공통 적용할 미들웨어. `None`이면 적용하지 않습니다.
+        default_interrupt_on: 기본 general-purpose 서브에이전트에 사용할 tool interrupt 설정.
+            또한 개별 서브에이전트가 별도 설정을 지정하지 않았을 때의 fallback입니다.
+        subagents: 서브에이전트 spec 또는 사전 컴파일된 agent 목록.
+        general_purpose_agent: general-purpose 서브에이전트를 포함할지 여부.
 
     Returns:
-        Tuple of (agent_dict, description_list) where agent_dict maps agent names
-        to runnable instances and description_list contains formatted descriptions.
+        `(agent_dict, description_list)` 튜플.
+        `agent_dict`는 에이전트 이름 → runnable 인스턴스를 매핑하고,
+        `description_list`는 task 도구에 주입될 포맷된 설명 목록입니다.
     """
-    # Use empty list if None (no default middleware)
+    # `None`이면 빈 리스트로 대체(기본 미들웨어 미적용)
     default_subagent_middleware = default_middleware or []
 
     agents: dict[str, Any] = {}
     subagent_descriptions = []
 
-    # Create general-purpose agent if enabled
+    # general-purpose 에이전트(선택)를 생성
     if general_purpose_agent:
         general_purpose_middleware = [*default_subagent_middleware]
         if default_interrupt_on:
@@ -255,7 +252,7 @@ def _get_subagents(
         agents["general-purpose"] = general_purpose_subagent
         subagent_descriptions.append(f"- general-purpose: {DEFAULT_GENERAL_PURPOSE_DESCRIPTION}")
 
-    # Process custom subagents
+    # 커스텀 서브에이전트를 처리
     for agent_ in subagents:
         subagent_descriptions.append(f"- {agent_['name']}: {agent_['description']}")
         if "runnable" in agent_:
@@ -291,7 +288,7 @@ def _create_task_tool(
     general_purpose_agent: bool,
     task_description: str | None = None,
 ) -> BaseTool:
-    """Create a task tool for invoking subagents.
+    """서브에이전트를 호출하는 `task` 도구를 생성합니다.
 
     Args:
         default_model: Default model for subagents.
@@ -319,7 +316,7 @@ def _create_task_tool(
 
     def _return_command_with_state_update(result: dict, tool_call_id: str) -> Command:
         state_update = {k: v for k, v in result.items() if k not in _EXCLUDED_STATE_KEYS}
-        # Strip trailing whitespace to prevent API errors with Anthropic
+        # Anthropic API에서 오류가 나지 않도록 trailing whitespace를 제거합니다.
         message_text = result["messages"][-1].text.rstrip() if result["messages"][-1].text else ""
         return Command(
             update={
@@ -329,14 +326,14 @@ def _create_task_tool(
         )
 
     def _validate_and_prepare_state(subagent_type: str, description: str, runtime: ToolRuntime) -> tuple[Runnable, dict]:
-        """Prepare state for invocation."""
+        """서브에이전트 호출을 위한 state를 준비합니다."""
         subagent = subagent_graphs[subagent_type]
         # Create a new state dict to avoid mutating the original
         subagent_state = {k: v for k, v in runtime.state.items() if k not in _EXCLUDED_STATE_KEYS}
         subagent_state["messages"] = [HumanMessage(content=description)]
         return subagent, subagent_state
 
-    # Use custom description if provided, otherwise use default template
+    # 커스텀 설명이 주어지면 사용하고, 아니면 기본 템플릿을 사용합니다.
     if task_description is None:
         task_description = TASK_TOOL_DESCRIPTION.format(available_agents=subagent_description_str)
     elif "{available_agents}" in task_description:
@@ -382,7 +379,7 @@ def _create_task_tool(
 
 
 class SubAgentMiddleware(AgentMiddleware):
-    """Middleware for providing subagents to an agent via a `task` tool.
+    """`task` 도구를 통해 에이전트에 서브에이전트를 제공하는 미들웨어입니다.
 
     This  middleware adds a `task` tool to the agent that can be used to invoke subagents.
     Subagents are useful for handling complex tasks that require multiple steps, or tasks
@@ -454,7 +451,7 @@ class SubAgentMiddleware(AgentMiddleware):
         general_purpose_agent: bool = True,
         task_description: str | None = None,
     ) -> None:
-        """Initialize the SubAgentMiddleware."""
+        """SubAgentMiddleware를 초기화합니다."""
         super().__init__()
         self.system_prompt = system_prompt
         task_tool = _create_task_tool(
@@ -473,7 +470,7 @@ class SubAgentMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelResponse:
-        """Update the system prompt to include instructions on using subagents."""
+        """System prompt에 서브에이전트 사용 지침을 포함하도록 업데이트합니다."""
         if self.system_prompt is not None:
             system_prompt = request.system_prompt + "\n\n" + self.system_prompt if request.system_prompt else self.system_prompt
             return handler(request.override(system_prompt=system_prompt))
@@ -484,7 +481,7 @@ class SubAgentMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelResponse:
-        """(async) Update the system prompt to include instructions on using subagents."""
+        """(async) System prompt에 서브에이전트 사용 지침을 포함하도록 업데이트합니다."""
         if self.system_prompt is not None:
             system_prompt = request.system_prompt + "\n\n" + self.system_prompt if request.system_prompt else self.system_prompt
             return await handler(request.override(system_prompt=system_prompt))

@@ -3,6 +3,7 @@
 import asyncio
 import json
 import sqlite3
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -34,7 +35,7 @@ class TestThreadFunctions:
     """Tests for thread query functions."""
 
     @pytest.fixture
-    def temp_db(self, tmp_path):
+    def temp_db(self, tmp_path: Path) -> Path:
         """Create a temporary database with test data."""
         db_path = tmp_path / "test_sessions.db"
 
@@ -81,7 +82,8 @@ class TestThreadFunctions:
         for tid, agent, updated in threads:
             metadata = json.dumps({"agent_name": agent, "updated_at": updated})
             conn.execute(
-                "INSERT INTO checkpoints (thread_id, checkpoint_ns, checkpoint_id, metadata) VALUES (?, '', ?, ?)",
+                "INSERT INTO checkpoints (thread_id, checkpoint_ns, checkpoint_id, metadata) "
+                "VALUES (?, '', ?, ?)",
                 (tid, f"cp_{tid}", metadata),
             )
 
@@ -90,7 +92,7 @@ class TestThreadFunctions:
 
         return db_path
 
-    def test_list_threads_empty(self, tmp_path):
+    def test_list_threads_empty(self, tmp_path: Path) -> None:
         """List returns empty when no threads exist."""
         db_path = tmp_path / "empty.db"
         # Create empty db with table structure
@@ -110,38 +112,38 @@ class TestThreadFunctions:
             threads = asyncio.run(sessions.list_threads())
             assert threads == []
 
-    def test_list_threads(self, temp_db):
+    def test_list_threads(self, temp_db: Path) -> None:
         """List returns all threads."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             threads = asyncio.run(sessions.list_threads())
             assert len(threads) == 3
 
-    def test_list_threads_filter_by_agent(self, temp_db):
+    def test_list_threads_filter_by_agent(self, temp_db: Path) -> None:
         """List filters by agent name."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             threads = asyncio.run(sessions.list_threads(agent_name="agent1"))
             assert len(threads) == 2
             assert all(t["agent_name"] == "agent1" for t in threads)
 
-    def test_list_threads_limit(self, temp_db):
+    def test_list_threads_limit(self, temp_db: Path) -> None:
         """List respects limit."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             threads = asyncio.run(sessions.list_threads(limit=2))
             assert len(threads) == 2
 
-    def test_get_most_recent(self, temp_db):
+    def test_get_most_recent(self, temp_db: Path) -> None:
         """Get most recent returns latest thread."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             tid = asyncio.run(sessions.get_most_recent())
             assert tid is not None
 
-    def test_get_most_recent_filter(self, temp_db):
+    def test_get_most_recent_filter(self, temp_db: Path) -> None:
         """Get most recent filters by agent."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             tid = asyncio.run(sessions.get_most_recent(agent_name="agent2"))
             assert tid == "thread2"
 
-    def test_get_most_recent_empty(self, tmp_path):
+    def test_get_most_recent_empty(self, tmp_path: Path) -> None:
         """Get most recent returns None when empty."""
         db_path = tmp_path / "empty.db"
         # Create empty db with table structure
@@ -161,36 +163,36 @@ class TestThreadFunctions:
             tid = asyncio.run(sessions.get_most_recent())
             assert tid is None
 
-    def test_thread_exists(self, temp_db):
+    def test_thread_exists(self, temp_db: Path) -> None:
         """Thread exists returns True for existing thread."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             assert asyncio.run(sessions.thread_exists("thread1")) is True
 
-    def test_thread_not_exists(self, temp_db):
+    def test_thread_not_exists(self, temp_db: Path) -> None:
         """Thread exists returns False for non-existing thread."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             assert asyncio.run(sessions.thread_exists("nonexistent")) is False
 
-    def test_get_thread_agent(self, temp_db):
+    def test_get_thread_agent(self, temp_db: Path) -> None:
         """Get thread agent returns correct agent name."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             agent = asyncio.run(sessions.get_thread_agent("thread1"))
             assert agent == "agent1"
 
-    def test_get_thread_agent_not_found(self, temp_db):
+    def test_get_thread_agent_not_found(self, temp_db: Path) -> None:
         """Get thread agent returns None for non-existing thread."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             agent = asyncio.run(sessions.get_thread_agent("nonexistent"))
             assert agent is None
 
-    def test_delete_thread(self, temp_db):
+    def test_delete_thread(self, temp_db: Path) -> None:
         """Delete thread removes thread."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             result = asyncio.run(sessions.delete_thread("thread1"))
             assert result is True
             assert asyncio.run(sessions.thread_exists("thread1")) is False
 
-    def test_delete_thread_not_found(self, temp_db):
+    def test_delete_thread_not_found(self, temp_db: Path) -> None:
         """Delete thread returns False for non-existing thread."""
         with patch.object(sessions, "get_db_path", return_value=temp_db):
             result = asyncio.run(sessions.delete_thread("nonexistent"))
@@ -200,10 +202,10 @@ class TestThreadFunctions:
 class TestGetCheckpointer:
     """Tests for get_checkpointer async context manager."""
 
-    def test_returns_async_sqlite_saver(self, tmp_path):
+    def test_returns_async_sqlite_saver(self, tmp_path: Path) -> None:
         """Get checkpointer returns AsyncSqliteSaver."""
 
-        async def _test():
+        async def _test() -> None:
             db_path = tmp_path / "test.db"
             with patch.object(sessions, "get_db_path", return_value=db_path):
                 async with sessions.get_checkpointer() as cp:

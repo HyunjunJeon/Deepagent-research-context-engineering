@@ -1,4 +1,7 @@
-"""Simplified middleware that exposes a basic shell tool to agents."""
+"""에이전트에 기본 셸 도구를 노출하는 간단한 미들웨어입니다.
+
+Simplified middleware that exposes a basic shell tool to agents.
+"""
 
 from __future__ import annotations
 
@@ -89,7 +92,7 @@ class ShellMiddleware(AgentMiddleware[AgentState, Any]):
             raise ToolException(msg)
 
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S602
                 command,
                 check=False,
                 shell=True,
@@ -106,8 +109,7 @@ class ShellMiddleware(AgentMiddleware[AgentState, Any]):
                 output_parts.append(result.stdout)
             if result.stderr:
                 stderr_lines = result.stderr.strip().split("\n")
-                for line in stderr_lines:
-                    output_parts.append(f"[stderr] {line}")
+                output_parts.extend([f"[stderr] {line}" for line in stderr_lines])
 
             output = "\n".join(output_parts) if output_parts else "<no output>"
 

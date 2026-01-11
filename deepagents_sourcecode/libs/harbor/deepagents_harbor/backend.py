@@ -1,4 +1,4 @@
-"""Implement harbor backend."""
+"""Harbor backend 구현입니다."""
 
 import base64
 import shlex
@@ -15,22 +15,21 @@ from harbor.environments.base import BaseEnvironment
 
 
 class HarborSandbox(SandboxBackendProtocol):
-    """A sandbox implementation without assuming that python3 is available."""
+    """python3 존재를 가정하지 않는 샌드박스 구현체입니다."""
 
     def __init__(self, environment: BaseEnvironment) -> None:
-        """Initialize HarborSandbox with the given environment."""
+        """주어진 environment로 HarborSandbox를 초기화합니다."""
         self.environment = environment
 
     async def aexecute(
         self,
         command: str,
     ) -> ExecuteResponse:
-        """Execute a bash command in the task environment."""
+        """작업 환경에서 bash 커맨드를 실행합니다(async)."""
         result = await self.environment.exec(command)
 
-        # These errors appear in harbor environments when running bash commands
-        # in non-interactive/non-TTY contexts. They're harmless artifacts.
-        # Filter them from both stdout and stderr, then collect them to show in stderr.
+        # Harbor 환경에서 non-interactive/non-TTY 컨텍스트로 bash를 실행할 때 자주 등장하는 오류 메시지들입니다.
+        # 대부분 무해한 아티팩트이므로 stdout/stderr에서 제거한 뒤, stderr에만 정리해서 붙입니다.
         error_messages = [
             "bash: cannot set terminal process group (-1): Inappropriate ioctl for device",
             "bash: no job control in this shell",
@@ -40,7 +39,7 @@ class HarborSandbox(SandboxBackendProtocol):
         stdout = result.stdout or ""
         stderr = result.stderr or ""
 
-        # Collect the bash messages if they appear (to move to stderr)
+        # bash 메시지가 있으면 수집하여(stderr로 이동)
         bash_messages = []
         for error_msg in error_messages:
             if error_msg in stdout:
@@ -52,12 +51,12 @@ class HarborSandbox(SandboxBackendProtocol):
         stdout = stdout.strip()
         stderr = stderr.strip()
 
-        # Add bash messages to stderr
+        # bash 메시지를 stderr에 추가
         if bash_messages:
             bash_msg_text = "\n".join(bash_messages)
             stderr = f"{bash_msg_text}\n{stderr}".strip() if stderr else bash_msg_text
 
-        # Only append stderr label if there's actual stderr content
+        # stderr가 실제로 있을 때만 라벨을 붙입니다.
         if stderr:
             output = stdout + "\n\n stderr: " + stderr if stdout else "\n stderr: " + stderr
         else:
@@ -71,12 +70,12 @@ class HarborSandbox(SandboxBackendProtocol):
         self,
         command: str,
     ) -> ExecuteResponse:
-        """Execute a bash command in the task environment."""
+        """작업 환경에서 bash 커맨드를 실행합니다."""
         raise NotImplementedError("This backend only supports async execution")
 
     @property
     def id(self) -> str:
-        """Unique identifier for the sandbox backend."""
+        """샌드박스 백엔드 인스턴스의 고유 식별자."""
         return self.environment.session_id
 
     async def aread(
@@ -85,11 +84,11 @@ class HarborSandbox(SandboxBackendProtocol):
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """Read file content with line numbers using shell commands."""
-        # Escape file path for shell
+        """셸 커맨드를 이용해 파일을 읽고 라인 번호와 함께 반환합니다(async)."""
+        # 셸에서 안전하게 쓰도록 경로를 escape
         safe_path = shlex.quote(file_path)
 
-        # Check if file exists and handle empty files
+        # 파일 존재 여부 확인 및 빈 파일 처리
         cmd = f"""
 if [ ! -f {safe_path} ]; then
     echo "Error: File not found"

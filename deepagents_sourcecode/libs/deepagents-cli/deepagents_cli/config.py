@@ -1,4 +1,7 @@
-"""Configuration, constants, and model creation for the CLI."""
+"""CLI 설정/상수/모델 생성 관련 로직입니다.
+
+Configuration, constants, and model creation for the CLI.
+"""
 
 import os
 import re
@@ -24,7 +27,7 @@ if _deepagents_project:
     os.environ["LANGSMITH_PROJECT"] = _deepagents_project
 
 # Now safe to import LangChain modules
-from langchain_core.language_models import BaseChatModel
+from langchain_core.language_models import BaseChatModel  # noqa: E402
 
 # Color scheme
 COLORS = {
@@ -115,12 +118,12 @@ def _find_project_agent_md(project_root: Path) -> list[Path]:
     """
     paths = []
 
-    # Check .deepagents/AGENTS.md (preferred)
+    # Prefer the `.deepagents/AGENTS.md` location when present.
     deepagents_md = project_root / ".deepagents" / "AGENTS.md"
     if deepagents_md.exists():
         paths.append(deepagents_md)
 
-    # Check root AGENTS.md (fallback, but also include if both exist)
+    # Also look for a repository-root `AGENTS.md` (and include both if both exist).
     root_md = project_root / "AGENTS.md"
     if root_md.exists():
         paths.append(root_md)
@@ -377,7 +380,13 @@ settings = Settings.from_environment()
 class SessionState:
     """Holds mutable session state (auto-approve mode, etc)."""
 
-    def __init__(self, auto_approve: bool = False, no_splash: bool = False) -> None:
+    def __init__(self, *, auto_approve: bool = False, no_splash: bool = False) -> None:
+        """세션 상태를 초기화합니다.
+
+        Args:
+            auto_approve: 도구 호출을 자동 승인할지 여부
+            no_splash: 시작 시 스플래시 화면을 숨길지 여부
+        """
         self.auto_approve = auto_approve
         self.no_splash = no_splash
         self.exit_hint_until: float | None = None
@@ -439,7 +448,8 @@ def create_model(model_name_override: str | None = None) -> BaseChatModel:
         provider = _detect_provider(model_name_override)
         if not provider:
             console.print(
-                f"[bold red]Error:[/bold red] Could not detect provider from model name: {model_name_override}"
+                "[bold red]Error:[/bold red] Could not detect provider from model name: "
+                f"{model_name_override}"
             )
             console.print("\nSupported model name patterns:")
             console.print("  - OpenAI: gpt-*, o1-*, o3-*")
@@ -450,17 +460,20 @@ def create_model(model_name_override: str | None = None) -> BaseChatModel:
         # Check if API key for detected provider is available
         if provider == "openai" and not settings.has_openai:
             console.print(
-                f"[bold red]Error:[/bold red] Model '{model_name_override}' requires OPENAI_API_KEY"
+                "[bold red]Error:[/bold red] Model "
+                f"'{model_name_override}' requires OPENAI_API_KEY"
             )
             sys.exit(1)
         elif provider == "anthropic" and not settings.has_anthropic:
             console.print(
-                f"[bold red]Error:[/bold red] Model '{model_name_override}' requires ANTHROPIC_API_KEY"
+                "[bold red]Error:[/bold red] Model "
+                f"'{model_name_override}' requires ANTHROPIC_API_KEY"
             )
             sys.exit(1)
         elif provider == "google" and not settings.has_google:
             console.print(
-                f"[bold red]Error:[/bold red] Model '{model_name_override}' requires GOOGLE_API_KEY"
+                "[bold red]Error:[/bold red] Model "
+                f"'{model_name_override}' requires GOOGLE_API_KEY"
             )
             sys.exit(1)
 
@@ -510,3 +523,6 @@ def create_model(model_name_override: str | None = None) -> BaseChatModel:
             temperature=0,
             max_tokens=None,
         )
+
+    msg = f"Unsupported model provider: {provider}"
+    raise RuntimeError(msg)

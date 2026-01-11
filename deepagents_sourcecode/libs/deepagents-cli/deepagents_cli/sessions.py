@@ -1,4 +1,7 @@
-"""Thread management using LangGraph's built-in checkpoint persistence."""
+"""LangGraph 체크포인트 저장 기능을 사용한 스레드/세션 관리입니다.
+
+Thread management using LangGraph's built-in checkpoint persistence.
+"""
 
 import uuid
 from collections.abc import AsyncIterator

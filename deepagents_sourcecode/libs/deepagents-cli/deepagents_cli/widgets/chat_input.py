@@ -1,4 +1,7 @@
-"""Chat input widget for deepagents-cli with autocomplete and history support."""
+"""자동완성/히스토리를 지원하는 deepagents-cli 채팅 입력 위젯입니다.
+
+Chat input widget for deepagents-cli with autocomplete and history support.
+"""
 
 from __future__ import annotations
 

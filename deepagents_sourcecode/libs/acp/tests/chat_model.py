@@ -1,10 +1,8 @@
-"""Fake chat models for testing purposes."""
+"""테스트용 가짜(chat) 모델 구현입니다."""
 
 import re
 from collections.abc import Callable, Iterator, Sequence
-from typing import Any, Literal, cast
-
-from typing_extensions import override
+from typing import Any, cast
 
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models import LanguageModelInput
@@ -13,10 +11,11 @@ from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatGenerationChunk, ChatResult
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
+from typing_extensions import override
 
 
 class GenericFakeChatModel(BaseChatModel):
-    """Generic fake chat model that can be used to test the chat model interface.
+    r"""Generic fake chat model that can be used to test the chat model interface.
 
     * Chat model should be usable in both sync and async tests
     * Invokes `on_llm_new_token` to allow for testing of callback related code for new
@@ -29,7 +28,7 @@ class GenericFakeChatModel(BaseChatModel):
             - None (default): Return content in a single chunk (no streaming)
             - A string delimiter (e.g., " "): Split content on this delimiter,
               preserving the delimiter as separate chunks
-            - A regex pattern (e.g., r"(\\s)"): Split using the pattern with a capture
+            - A regex pattern (e.g., r"(\s)"): Split using the pattern with a capture
               group to preserve delimiters
 
     Examples:
@@ -52,7 +51,7 @@ class GenericFakeChatModel(BaseChatModel):
     """
 
     messages: Iterator[AIMessage | str]
-    """Get an iterator over messages.
+    """메시지 이터레이터를 가져옵니다.
 
     This can be expanded to accept other types like Callables / dicts / strings
     to make the interface more generic if needed.
@@ -62,7 +61,7 @@ class GenericFakeChatModel(BaseChatModel):
     """
 
     stream_delimiter: str | None = None
-    """Delimiter for chunking content during streaming.
+    """스트리밍 시 content를 chunk로 나누기 위한 delimiter입니다.
 
     - None (default): No chunking, returns content in a single chunk
     - String: Split content on this exact string, preserving delimiter as chunks
@@ -227,5 +226,5 @@ class GenericFakeChatModel(BaseChatModel):
         tool_choice: str | None = None,
         **kwargs: Any,
     ) -> Runnable[LanguageModelInput, AIMessage]:
-        """Override bind_tools to return self for testing purposes."""
+        """테스트 목적상 `bind_tools`를 오버라이드하여 자기 자신을 반환합니다."""
         return self

@@ -1,14 +1,19 @@
-"""Utilities for handling image paste from clipboard."""
+"""클립보드에서 이미지 붙여넣기(paste)를 처리하는 유틸리티입니다.
+
+Utilities for handling image paste from clipboard.
+"""
 
 import base64
+import contextlib
 import io
-import os
+import shutil
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 
 @dataclass
@@ -54,33 +59,36 @@ def _get_macos_clipboard_image() -> ImageData | None:
         ImageData if an image is found, None otherwise
     """
     # Try pngpaste first (fast if installed)
-    try:
-        result = subprocess.run(
-            ["pngpaste", "-"],
-            capture_output=True,
-            check=False,
-            timeout=2,
-        )
-        if result.returncode == 0 and result.stdout:
-            # Successfully got PNG data
-            try:
-                Image.open(io.BytesIO(result.stdout))  # Validate it's a real image
-                base64_data = base64.b64encode(result.stdout).decode("utf-8")
-                return ImageData(
-                    base64_data=base64_data,
-                    format="png",  # 'pngpaste -' always outputs PNG
-                    placeholder="[image]",
-                )
-            except Exception:
-                pass  # Invalid image data
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass  # pngpaste not installed or timed out
+    pngpaste_path = shutil.which("pngpaste")
+    if pngpaste_path:
+        try:
+            result = subprocess.run(  # noqa: S603
+                [pngpaste_path, "-"],
+                capture_output=True,
+                check=False,
+                timeout=2,
+            )
+            if result.returncode == 0 and result.stdout:
+                # Successfully got PNG data
+                try:
+                    Image.open(io.BytesIO(result.stdout))  # Validate it's a real image
+                except (UnidentifiedImageError, OSError):
+                    pass  # Invalid image data
+                else:
+                    base64_data = base64.b64encode(result.stdout).decode("utf-8")
+                    return ImageData(
+                        base64_data=base64_data,
+                        format="png",  # 'pngpaste -' always outputs PNG
+                        placeholder="[image]",
+                    )
+        except subprocess.TimeoutExpired:
+            pass  # pngpaste timed out
 
     # Fallback to osascript with temp file (built-in but slower)
     return _get_clipboard_via_osascript()
 
 
-def _get_clipboard_via_osascript() -> ImageData | None:
+def _get_clipboard_via_osascript() -> ImageData | None:  # noqa: PLR0911
     """Get clipboard image via osascript using a temp file.
 
     osascript outputs data in a special format that can't be captured as raw binary,
@@ -89,14 +97,18 @@ def _get_clipboard_via_osascript() -> ImageData | None:
     Returns:
         ImageData if an image is found, None otherwise
     """
+    osascript_path = shutil.which("osascript")
+    if not osascript_path:
+        return None
+
     # Create a temp file for the image
-    fd, temp_path = tempfile.mkstemp(suffix=".png")
-    os.close(fd)
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        temp_file = Path(tmp.name)
 
     try:
         # First check if clipboard has PNG data
-        check_result = subprocess.run(
-            ["osascript", "-e", "clipboard info"],
+        check_result = subprocess.run(  # noqa: S603
+            [osascript_path, "-e", "clipboard info"],
             capture_output=True,
             check=False,
             timeout=2,
@@ -115,7 +127,7 @@ def _get_clipboard_via_osascript() -> ImageData | None:
         if "pngf" in clipboard_info:
             get_script = f"""
             set pngData to the clipboard as «class PNGf»
-            set theFile to open for access POSIX file "{temp_path}" with write permission
+            set theFile to open for access POSIX file "{temp_file.as_posix()}" with write permission
             write pngData to theFile
             close access theFile
             return "success"
@@ -123,14 +135,14 @@ def _get_clipboard_via_osascript() -> ImageData | None:
         else:
             get_script = f"""
             set tiffData to the clipboard as TIFF picture
-            set theFile to open for access POSIX file "{temp_path}" with write permission
+            set theFile to open for access POSIX file "{temp_file.as_posix()}" with write permission
             write tiffData to theFile
             close access theFile
             return "success"
             """
 
-        result = subprocess.run(
-            ["osascript", "-e", get_script],
+        result = subprocess.run(  # noqa: S603
+            [osascript_path, "-e", get_script],
             capture_output=True,
             check=False,
             timeout=3,
@@ -141,12 +153,11 @@ def _get_clipboard_via_osascript() -> ImageData | None:
             return None
 
         # Check if file was created and has content
-        if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
+        if not temp_file.exists() or temp_file.stat().st_size == 0:
             return None
 
         # Read and validate the image
-        with open(temp_path, "rb") as f:
-            image_data = f.read()
+        image_data = temp_file.read_bytes()
 
         try:
             image = Image.open(io.BytesIO(image_data))
@@ -161,17 +172,15 @@ def _get_clipboard_via_osascript() -> ImageData | None:
                 format="png",
                 placeholder="[image]",
             )
-        except Exception:
+        except (UnidentifiedImageError, OSError):
             return None
 
     except (subprocess.TimeoutExpired, OSError):
         return None
     finally:
         # Clean up temp file
-        try:
-            os.unlink(temp_path)
-        except OSError:
-            pass
+        with contextlib.suppress(OSError):
+            temp_file.unlink()
 
 
 def encode_image_to_base64(image_bytes: bytes) -> str:
@@ -203,7 +212,6 @@ def create_multimodal_content(text: str, images: list[ImageData]) -> list[dict]:
         content_blocks.append({"type": "text", "text": text})
 
     # Add image blocks
-    for image in images:
-        content_blocks.append(image.to_message_content())
+    content_blocks.extend([image.to_message_content() for image in images])
 
     return content_blocks

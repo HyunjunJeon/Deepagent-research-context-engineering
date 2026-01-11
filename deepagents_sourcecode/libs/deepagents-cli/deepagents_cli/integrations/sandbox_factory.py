@@ -1,5 +1,9 @@
-"""Sandbox lifecycle management with context managers."""
+"""컨텍스트 매니저 기반 샌드박스 라이프사이클 관리 유틸리티입니다.
 
+Sandbox lifecycle management with context managers.
+"""
+
+import logging
 import os
 import shlex
 import string
@@ -11,6 +15,8 @@ from pathlib import Path
 from deepagents.backends.protocol import SandboxBackendProtocol
 
 from deepagents_cli.config import console
+
+logger = logging.getLogger(__name__)
 
 
 def _run_sandbox_setup(backend: SandboxBackendProtocol, setup_script_path: str) -> None:
@@ -93,8 +99,8 @@ def create_modal_sandbox(
                     process.wait()
                     if process.returncode == 0:
                         break
-                except Exception:
-                    pass
+                except Exception as err:  # noqa: BLE001
+                    logger.debug("Modal sandbox not ready yet.", exc_info=err)
                 time.sleep(2)
             else:
                 # Timeout - cleanup and fail
@@ -116,8 +122,8 @@ def create_modal_sandbox(
                     console.print(f"[dim]Terminating Modal sandbox {sandbox_id}...[/dim]")
                     sandbox.terminate()
                     console.print(f"[dim]✓ Modal sandbox {sandbox_id} terminated[/dim]")
-                except Exception as e:
-                    console.print(f"[yellow]⚠ Cleanup failed: {e}[/yellow]")
+                except Exception as err:  # noqa: BLE001
+                    console.print(f"[yellow]⚠ Cleanup failed: {err}[/yellow]")
 
 
 @contextmanager
@@ -188,8 +194,8 @@ def create_runloop_sandbox(
                 console.print(f"[dim]Shutting down Runloop devbox {sandbox_id}...[/dim]")
                 client.devboxes.shutdown(id=devbox.id)
                 console.print(f"[dim]✓ Runloop devbox {sandbox_id} terminated[/dim]")
-            except Exception as e:
-                console.print(f"[yellow]⚠ Cleanup failed: {e}[/yellow]")
+            except Exception as err:  # noqa: BLE001
+                console.print(f"[yellow]⚠ Cleanup failed: {err}[/yellow]")
 
 
 @contextmanager
@@ -238,8 +244,8 @@ def create_daytona_sandbox(
             result = sandbox.process.exec("echo ready", timeout=5)
             if result.exit_code == 0:
                 break
-        except Exception:
-            pass
+        except Exception as err:  # noqa: BLE001
+            logger.debug("Daytona sandbox not ready yet.", exc_info=err)
         time.sleep(2)
     else:
         try:
@@ -262,8 +268,8 @@ def create_daytona_sandbox(
         try:
             sandbox.delete()
             console.print(f"[dim]✓ Daytona sandbox {sandbox_id} terminated[/dim]")
-        except Exception as e:
-            console.print(f"[yellow]⚠ Cleanup failed: {e}[/yellow]")
+        except Exception as err:  # noqa: BLE001
+            console.print(f"[yellow]⚠ Cleanup failed: {err}[/yellow]")
 
 
 _PROVIDER_TO_WORKING_DIR = {

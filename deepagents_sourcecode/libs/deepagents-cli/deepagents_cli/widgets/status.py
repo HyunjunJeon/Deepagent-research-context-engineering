@@ -1,4 +1,4 @@
-"""Status bar widget for deepagents-cli."""
+"""deepagents-cli용 상태 표시줄(Status bar) 위젯입니다."""
 
 from __future__ import annotations
 
@@ -13,9 +13,11 @@ from textual.widgets import Static
 if TYPE_CHECKING:
     from textual.app import ComposeResult
 
+TOKENS_K_THRESHOLD = 1000
+
 
 class StatusBar(Horizontal):
-    """Status bar showing mode, auto-approve status, and working directory."""
+    """모드/자동 승인/작업 디렉토리 등을 표시하는 상태 표시줄입니다."""
 
     DEFAULT_CSS = """
     StatusBar {
@@ -90,18 +92,18 @@ class StatusBar(Horizontal):
     tokens: reactive[int] = reactive(0, init=False)
 
     def __init__(self, cwd: str | Path | None = None, **kwargs: Any) -> None:
-        """Initialize the status bar.
+        """상태 표시줄을 초기화합니다.
 
         Args:
             cwd: Current working directory to display
             **kwargs: Additional arguments passed to parent
         """
         super().__init__(**kwargs)
-        # Store initial cwd - will be used in compose()
+        # 초기 cwd를 저장(compose()에서 사용)
         self._initial_cwd = str(cwd) if cwd else str(Path.cwd())
 
     def compose(self) -> ComposeResult:
-        """Compose the status bar layout."""
+        """상태 표시줄 레이아웃을 구성합니다."""
         yield Static("", classes="status-mode normal", id="mode-indicator")
         yield Static(
             "manual | shift+tab to cycle",
@@ -113,11 +115,11 @@ class StatusBar(Horizontal):
         # CWD shown in welcome banner, not pinned in status bar
 
     def on_mount(self) -> None:
-        """Set reactive values after mount to trigger watchers safely."""
+        """마운트(on_mount) 이후 reactive 값을 설정해 watcher가 안전하게 동작하도록 합니다."""
         self.cwd = self._initial_cwd
 
     def watch_mode(self, mode: str) -> None:
-        """Update mode indicator when mode changes."""
+        """모드(mode) 변경 시 표시를 갱신합니다."""
         try:
             indicator = self.query_one("#mode-indicator", Static)
         except NoMatches:
@@ -135,7 +137,7 @@ class StatusBar(Horizontal):
             indicator.add_class("normal")
 
     def watch_auto_approve(self, new_value: bool) -> None:  # noqa: FBT001
-        """Update auto-approve indicator when state changes."""
+        """auto-approve 상태 변경 시 표시를 갱신합니다."""
         try:
             indicator = self.query_one("#auto-approve-indicator", Static)
         except NoMatches:
@@ -150,7 +152,7 @@ class StatusBar(Horizontal):
             indicator.add_class("off")
 
     def watch_cwd(self, new_value: str) -> None:
-        """Update cwd display when it changes."""
+        """작업 디렉토리(cwd) 변경 시 표시를 갱신합니다."""
         try:
             display = self.query_one("#cwd-display", Static)
         except NoMatches:
@@ -158,7 +160,7 @@ class StatusBar(Horizontal):
         display.update(self._format_cwd(new_value))
 
     def watch_status_message(self, new_value: str) -> None:
-        """Update status message display."""
+        """상태 메시지(status message) 변경 시 표시를 갱신합니다."""
         try:
             msg_widget = self.query_one("#status-message", Static)
         except NoMatches:
@@ -173,10 +175,10 @@ class StatusBar(Horizontal):
             msg_widget.update("")
 
     def _format_cwd(self, cwd_path: str = "") -> str:
-        """Format the current working directory for display."""
+        """표시용으로 현재 작업 디렉토리를 포맷팅합니다."""
         path = Path(cwd_path or self.cwd or self._initial_cwd)
         try:
-            # Try to use ~ for home directory
+            # 홈 디렉토리는 ~로 표시 시도
             home = Path.home()
             if path.is_relative_to(home):
                 return "~/" + str(path.relative_to(home))
@@ -185,7 +187,7 @@ class StatusBar(Horizontal):
         return str(path)
 
     def set_mode(self, mode: str) -> None:
-        """Set the current input mode.
+        """현재 입력 모드를 설정합니다.
 
         Args:
             mode: One of "normal", "bash", or "command"
@@ -193,7 +195,7 @@ class StatusBar(Horizontal):
         self.mode = mode
 
     def set_auto_approve(self, *, enabled: bool) -> None:
-        """Set the auto-approve state.
+        """auto-approve 상태를 설정합니다.
 
         Args:
             enabled: Whether auto-approve is enabled
@@ -201,7 +203,7 @@ class StatusBar(Horizontal):
         self.auto_approve = enabled
 
     def set_status_message(self, message: str) -> None:
-        """Set the status message.
+        """상태 메시지를 설정합니다.
 
         Args:
             message: Status message to display (empty string to clear)
@@ -209,23 +211,23 @@ class StatusBar(Horizontal):
         self.status_message = message
 
     def watch_tokens(self, new_value: int) -> None:
-        """Update token display when count changes."""
+        """토큰 수 변경 시 표시를 갱신합니다."""
         try:
             display = self.query_one("#tokens-display", Static)
         except NoMatches:
             return
 
         if new_value > 0:
-            # Format with K suffix for thousands
-            if new_value >= 1000:
-                display.update(f"{new_value / 1000:.1f}K tokens")
+            # 천 단위는 K suffix로 표시
+            if new_value >= TOKENS_K_THRESHOLD:
+                display.update(f"{new_value / TOKENS_K_THRESHOLD:.1f}K tokens")
             else:
                 display.update(f"{new_value} tokens")
         else:
             display.update("")
 
     def set_tokens(self, count: int) -> None:
-        """Set the token count.
+        """토큰 수를 설정합니다.
 
         Args:
             count: Current context token count

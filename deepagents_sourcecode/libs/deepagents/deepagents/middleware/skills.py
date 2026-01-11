@@ -1,34 +1,33 @@
-"""Skills middleware for loading and exposing agent skills to the system prompt.
+"""에이전트 스킬(skills)을 로드하고 system prompt에 노출하는 미들웨어입니다.
 
-This module implements Anthropic's agent skills pattern with progressive disclosure,
-loading skills from backend storage via configurable sources.
+이 모듈은 Anthropic의 agent skills 패턴(점진적 공개, progressive disclosure)을 구현하며,
+backend 스토리지로부터 스킬을 로드하기 위해 “소스(sources)”를 설정할 수 있게 합니다.
 
-## Architecture
+## 아키텍처
 
-Skills are loaded from one or more **sources** - paths in a backend where skills are
-organized. Sources are loaded in order, with later sources overriding earlier ones
-when skills have the same name (last one wins). This enables layering: base -> user
--> project -> team skills.
+스킬은 backend 내에서 스킬들이 정리되어 있는 경로(prefix)인 **sources**로부터 로드됩니다.
+sources는 지정된 순서대로 로드되며, 동일한 스킬 이름이 충돌할 경우 뒤에 오는 source가 우선합니다
+(last one wins). 이를 통해 `base -> user -> project -> team` 같은 레이어링이 가능합니다.
 
-The middleware uses backend APIs exclusively (no direct filesystem access), making it
-portable across different storage backends (filesystem, state, remote storage, etc.).
+이 미들웨어는 backend API만 사용하며(직접 파일시스템 접근 없음), 따라서 filesystem/state/remote storage 등
+다양한 backend 구현에 이식(portable) 가능합니다.
 
-For StateBackend (ephemeral/in-memory), use a factory function:
+StateBackend(ephemeral/in-memory)를 사용할 때는 팩토리 함수를 전달하세요.
 ```python
 SkillsMiddleware(backend=lambda rt: StateBackend(rt), ...)
 ```
 
-## Skill Structure
+## 스킬 디렉토리 구조
 
-Each skill is a directory containing a SKILL.md file with YAML frontmatter:
+각 스킬은 YAML frontmatter가 포함된 `SKILL.md`를 가진 디렉토리입니다.
 
 ```
 /skills/user/web-research/
-├── SKILL.md          # Required: YAML frontmatter + markdown instructions
-└── helper.py         # Optional: supporting files
+├── SKILL.md          # 필수: YAML frontmatter + Markdown 지침
+└── helper.py         # 선택: 보조 파일(스크립트/데이터 등)
 ```
 
-SKILL.md format:
+`SKILL.md` 형식 예시:
 ```markdown
 ---
 name: web-research
@@ -43,35 +42,34 @@ license: MIT
 ...
 ```
 
-## Skill Metadata (SkillMetadata)
+## 스킬 메타데이터(SkillMetadata)
 
-Parsed from YAML frontmatter per Agent Skills specification:
-- `name`: Skill identifier (max 64 chars, lowercase alphanumeric and hyphens)
-- `description`: What the skill does (max 1024 chars)
-- `path`: Backend path to the SKILL.md file
+YAML frontmatter에서 Agent Skills 사양에 따라 파싱되는 필드:
+- `name`: 스킬 식별자(최대 64자, 소문자 영숫자+하이픈)
+- `description`: 스킬 설명(최대 1024자)
+- `path`: backend 내 `SKILL.md`의 경로
 - Optional: `license`, `compatibility`, `metadata`, `allowed_tools`
 
-## Sources
+## 소스(Sources)
 
-Sources are simply paths to skill directories in the backend. The source name is
-derived from the last component of the path (e.g., "/skills/user/" -> "user").
+source는 backend 내 “스킬 디렉토리들의 루트 경로”입니다.
+source의 표시 이름은 경로의 마지막 컴포넌트로부터 유도됩니다(예: `"/skills/user/" -> "user"`).
 
-Example sources:
 ```python
 [
     "/skills/user/",
-    "/skills/project/"
+    "/skills/project/",
 ]
 ```
 
-## Path Conventions
+## 경로 규칙
 
-All paths use POSIX conventions (forward slashes) via `PurePosixPath`:
-- Backend paths: "/skills/user/web-research/SKILL.md"
-- Virtual, platform-independent
-- Backends handle platform-specific conversions as needed
+모든 경로는 `PurePosixPath`를 통해 POSIX 표기(슬래시 `/`)를 사용합니다.
+- backend 경로 예: `"/skills/user/web-research/SKILL.md"`
+- 플랫폼 독립적인 가상 경로(virtual path)
+- 실제 플랫폼별 변환은 backend가 필요 시 처리합니다.
 
-## Usage
+## 사용 예시
 
 ```python
 from deepagents.backends.state import StateBackend
@@ -116,7 +114,7 @@ from langgraph.runtime import Runtime
 
 logger = logging.getLogger(__name__)
 
-# Security: Maximum size for SKILL.md files to prevent DoS attacks (10MB)
+# 보안: DoS 공격을 방지하기 위한 SKILL.md 최대 크기(10MB)
 MAX_SKILL_FILE_SIZE = 10 * 1024 * 1024
 
 # Agent Skills specification constraints (https://agentskills.io/specification)
@@ -125,46 +123,46 @@ MAX_SKILL_DESCRIPTION_LENGTH = 1024
 
 
 class SkillMetadata(TypedDict):
-    """Metadata for a skill per Agent Skills specification (https://agentskills.io/specification)."""
+    """Agent Skills 사양(https://agentskills.io/specification)에 따른 스킬 메타데이터입니다."""
 
     name: str
-    """Skill identifier (max 64 chars, lowercase alphanumeric and hyphens)."""
+    """스킬 식별자(최대 64자, 소문자 영숫자 및 하이픈)."""
 
     description: str
-    """What the skill does (max 1024 chars)."""
+    """스킬 설명(최대 1024자)."""
 
     path: str
-    """Path to the SKILL.md file."""
+    """`SKILL.md` 파일의 경로."""
 
     license: str | None
-    """License name or reference to bundled license file."""
+    """라이선스 이름 또는 번들된 라이선스 파일에 대한 참조."""
 
     compatibility: str | None
-    """Environment requirements (max 500 chars)."""
+    """환경 요구사항(최대 500자)."""
 
     metadata: dict[str, str]
-    """Arbitrary key-value mapping for additional metadata."""
+    """추가 메타데이터를 위한 임의의 key-value 맵."""
 
     allowed_tools: list[str]
-    """Space-delimited list of pre-approved tools. (Experimental)"""
+    """사전 승인된 도구 목록(공백 구분). (실험적)"""
 
 
 class SkillsState(AgentState):
-    """State for the skills middleware."""
+    """SkillsMiddleware의 state 스키마입니다."""
 
     skills_metadata: NotRequired[Annotated[list[SkillMetadata], PrivateStateAttr]]
-    """List of loaded skill metadata from all configured sources."""
+    """설정된 모든 source에서 로드된 스킬 메타데이터 목록."""
 
 
 class SkillsStateUpdate(TypedDict):
-    """State update for the skills middleware."""
+    """SkillsMiddleware의 state 업데이트 타입입니다."""
 
     skills_metadata: list[SkillMetadata]
-    """List of loaded skill metadata to merge into state."""
+    """state에 병합할 스킬 메타데이터 목록."""
 
 
 def _validate_skill_name(name: str, directory_name: str) -> tuple[bool, str]:
-    """Validate skill name per Agent Skills specification.
+    """Agent Skills 사양에 따라 스킬 이름을 검증합니다.
 
     Requirements per spec:
     - Max 64 characters
@@ -197,7 +195,7 @@ def _parse_skill_metadata(
     skill_path: str,
     directory_name: str,
 ) -> SkillMetadata | None:
-    """Parse YAML frontmatter from SKILL.md content.
+    """SKILL.md에서 YAML frontmatter를 파싱합니다.
 
     Extracts metadata per Agent Skills specification from YAML frontmatter delimited
     by --- markers at the start of the content.
@@ -280,7 +278,7 @@ def _parse_skill_metadata(
 
 
 def _list_skills(backend: BackendProtocol, source_path: str) -> list[SkillMetadata]:
-    """List all skills from a backend source.
+    """하나의 source(backend 경로)에서 모든 스킬을 나열합니다.
 
     Scans backend for subdirectories containing SKILL.md files, downloads their content,
     parses YAML frontmatter, and returns skill metadata.
@@ -302,7 +300,7 @@ def _list_skills(backend: BackendProtocol, source_path: str) -> list[SkillMetada
 
     skills: list[SkillMetadata] = []
     items = backend.ls_info(base_path)
-    # Find all skill directories (directories containing SKILL.md)
+    # 스킬 디렉토리 목록(SKILL.md를 담고 있을 수 있는 하위 디렉토리)을 수집
     skill_dirs = []
     for item in items:
         if not item.get("is_dir"):
@@ -312,10 +310,10 @@ def _list_skills(backend: BackendProtocol, source_path: str) -> list[SkillMetada
     if not skill_dirs:
         return []
 
-    # For each skill directory, check if SKILL.md exists and download it
+    # 각 스킬 디렉토리마다 SKILL.md 존재 여부를 확인하고 다운로드합니다.
     skill_md_paths = []
     for skill_dir_path in skill_dirs:
-        # Construct SKILL.md path using PurePosixPath for safe, standardized path operations
+        # 안전하고 표준화된 경로 연산을 위해 PurePosixPath로 SKILL.md 경로를 구성합니다.
         skill_dir = PurePosixPath(skill_dir_path)
         skill_md_path = str(skill_dir / "SKILL.md")
         skill_md_paths.append((skill_dir_path, skill_md_path))
@@ -323,10 +321,10 @@ def _list_skills(backend: BackendProtocol, source_path: str) -> list[SkillMetada
     paths_to_download = [skill_md_path for _, skill_md_path in skill_md_paths]
     responses = backend.download_files(paths_to_download)
 
-    # Parse each downloaded SKILL.md
+    # 다운로드된 각 SKILL.md를 파싱합니다.
     for (skill_dir_path, skill_md_path), response in zip(skill_md_paths, responses, strict=True):
         if response.error:
-            # Skill doesn't have a SKILL.md, skip it
+            # SKILL.md가 없는 디렉토리는 스킵
             continue
 
         if response.content is None:
@@ -339,10 +337,10 @@ def _list_skills(backend: BackendProtocol, source_path: str) -> list[SkillMetada
             logger.warning("Error decoding %s: %s", skill_md_path, e)
             continue
 
-        # Extract directory name from path using PurePosixPath
+        # PurePosixPath로 디렉토리 이름을 추출합니다.
         directory_name = PurePosixPath(skill_dir_path).name
 
-        # Parse metadata
+        # 메타데이터 파싱
         skill_metadata = _parse_skill_metadata(
             content=content,
             skill_path=skill_md_path,
@@ -355,7 +353,7 @@ def _list_skills(backend: BackendProtocol, source_path: str) -> list[SkillMetada
 
 
 async def _alist_skills(backend: BackendProtocol, source_path: str) -> list[SkillMetadata]:
-    """List all skills from a backend source (async version).
+    """하나의 source(backend 경로)에서 모든 스킬을 나열합니다(async 버전).
 
     Scans backend for subdirectories containing SKILL.md files, downloads their content,
     parses YAML frontmatter, and returns skill metadata.
@@ -377,7 +375,7 @@ async def _alist_skills(backend: BackendProtocol, source_path: str) -> list[Skil
 
     skills: list[SkillMetadata] = []
     items = await backend.als_info(base_path)
-    # Find all skill directories (directories containing SKILL.md)
+    # 스킬 디렉토리 목록(SKILL.md를 담고 있을 수 있는 하위 디렉토리)을 수집
     skill_dirs = []
     for item in items:
         if not item.get("is_dir"):
@@ -387,10 +385,10 @@ async def _alist_skills(backend: BackendProtocol, source_path: str) -> list[Skil
     if not skill_dirs:
         return []
 
-    # For each skill directory, check if SKILL.md exists and download it
+    # 각 스킬 디렉토리마다 SKILL.md 존재 여부를 확인하고 다운로드합니다.
     skill_md_paths = []
     for skill_dir_path in skill_dirs:
-        # Construct SKILL.md path using PurePosixPath for safe, standardized path operations
+        # 안전하고 표준화된 경로 연산을 위해 PurePosixPath로 SKILL.md 경로를 구성합니다.
         skill_dir = PurePosixPath(skill_dir_path)
         skill_md_path = str(skill_dir / "SKILL.md")
         skill_md_paths.append((skill_dir_path, skill_md_path))
@@ -398,10 +396,10 @@ async def _alist_skills(backend: BackendProtocol, source_path: str) -> list[Skil
     paths_to_download = [skill_md_path for _, skill_md_path in skill_md_paths]
     responses = await backend.adownload_files(paths_to_download)
 
-    # Parse each downloaded SKILL.md
+    # 다운로드된 각 SKILL.md를 파싱합니다.
     for (skill_dir_path, skill_md_path), response in zip(skill_md_paths, responses, strict=True):
         if response.error:
-            # Skill doesn't have a SKILL.md, skip it
+            # SKILL.md가 없는 디렉토리는 스킵
             continue
 
         if response.content is None:
@@ -414,10 +412,10 @@ async def _alist_skills(backend: BackendProtocol, source_path: str) -> list[Skil
             logger.warning("Error decoding %s: %s", skill_md_path, e)
             continue
 
-        # Extract directory name from path using PurePosixPath
+        # PurePosixPath로 디렉토리 이름을 추출합니다.
         directory_name = PurePosixPath(skill_dir_path).name
 
-        # Parse metadata
+        # 메타데이터 파싱
         skill_metadata = _parse_skill_metadata(
             content=content,
             skill_path=skill_md_path,
@@ -472,7 +470,7 @@ Remember: Skills make you more capable and consistent. When in doubt, check if a
 
 
 class SkillsMiddleware(AgentMiddleware):
-    """Middleware for loading and exposing agent skills to the system prompt.
+    """에이전트 스킬을 로드하고 system prompt에 노출하는 미들웨어입니다.
 
     Loads skills from backend sources and injects them into the system prompt
     using progressive disclosure (metadata first, full content on demand).
@@ -501,7 +499,7 @@ class SkillsMiddleware(AgentMiddleware):
     state_schema = SkillsState
 
     def __init__(self, *, backend: BACKEND_TYPES, sources: list[str]) -> None:
-        """Initialize the skills middleware.
+        """스킬 미들웨어를 초기화합니다.
 
         Args:
             backend: Backend instance or factory function that takes runtime and returns a backend.
@@ -513,7 +511,7 @@ class SkillsMiddleware(AgentMiddleware):
         self.system_prompt_template = SKILLS_SYSTEM_PROMPT
 
     def _get_backend(self, state: SkillsState, runtime: Runtime, config: RunnableConfig) -> BackendProtocol:
-        """Resolve backend from instance or factory.
+        """백엔드 인스턴스/팩토리로부터 실제 백엔드를 해석(resolve)합니다.
 
         Args:
             state: Current agent state.
@@ -524,7 +522,7 @@ class SkillsMiddleware(AgentMiddleware):
             Resolved backend instance
         """
         if callable(self._backend):
-            # Construct an artificial tool runtime to resolve backend factory
+            # backend 팩토리를 호출하기 위한 ToolRuntime을 구성합니다.
             tool_runtime = ToolRuntime(
                 state=state,
                 context=runtime.context,
@@ -541,7 +539,7 @@ class SkillsMiddleware(AgentMiddleware):
         return self._backend
 
     def _format_skills_locations(self) -> str:
-        """Format skills locations for display in system prompt."""
+        """System prompt에 표시할 skills location 섹션을 포맷팅합니다."""
         locations = []
         for i, source_path in enumerate(self.sources):
             name = PurePosixPath(source_path.rstrip("/")).name.capitalize()
@@ -550,7 +548,7 @@ class SkillsMiddleware(AgentMiddleware):
         return "\n".join(locations)
 
     def _format_skills_list(self, skills: list[SkillMetadata]) -> str:
-        """Format skills metadata for display in system prompt."""
+        """System prompt에 표시할 skills 목록을 포맷팅합니다."""
         if not skills:
             paths = [f"{source_path}" for source_path in self.sources]
             return f"(No skills available yet. You can create skills in {' or '.join(paths)})"
@@ -563,7 +561,7 @@ class SkillsMiddleware(AgentMiddleware):
         return "\n".join(lines)
 
     def modify_request(self, request: ModelRequest) -> ModelRequest:
-        """Inject skills documentation into a model request's system prompt.
+        """모델 요청의 system prompt에 skills 섹션을 주입합니다.
 
         Args:
             request: Model request to modify
@@ -588,7 +586,7 @@ class SkillsMiddleware(AgentMiddleware):
         return request.override(system_prompt=system_prompt)
 
     def before_agent(self, state: SkillsState, runtime: Runtime, config: RunnableConfig) -> SkillsStateUpdate | None:
-        """Load skills metadata before agent execution (synchronous).
+        """에이전트 실행 전에 스킬 메타데이터를 로드합니다(동기).
 
         Runs before each agent interaction to discover available skills from all
         configured sources. Re-loads on every call to capture any changes.
@@ -604,16 +602,16 @@ class SkillsMiddleware(AgentMiddleware):
         Returns:
             State update with skills_metadata populated, or None if already present
         """
-        # Skip if skills_metadata is already present in state (even if empty)
+        # state에 skills_metadata가 이미 있으면(비어 있어도) 스킵
         if "skills_metadata" in state:
             return None
 
-        # Resolve backend (supports both direct instances and factory functions)
+        # backend 해석(인스턴스/팩토리 모두 지원)
         backend = self._get_backend(state, runtime, config)
         all_skills: dict[str, SkillMetadata] = {}
 
-        # Load skills from each source in order
-        # Later sources override earlier ones (last one wins)
+        # source를 순서대로 로드합니다.
+        # 뒤에 오는 source가 앞의 source를 덮어씁니다(last one wins).
         for source_path in self.sources:
             source_skills = _list_skills(backend, source_path)
             for skill in source_skills:
@@ -623,7 +621,7 @@ class SkillsMiddleware(AgentMiddleware):
         return SkillsStateUpdate(skills_metadata=skills)
 
     async def abefore_agent(self, state: SkillsState, runtime: Runtime, config: RunnableConfig) -> SkillsStateUpdate | None:
-        """Load skills metadata before agent execution (async).
+        """에이전트 실행 전에 스킬 메타데이터를 로드합니다(async).
 
         Runs before each agent interaction to discover available skills from all
         configured sources. Re-loads on every call to capture any changes.
@@ -639,16 +637,16 @@ class SkillsMiddleware(AgentMiddleware):
         Returns:
             State update with skills_metadata populated, or None if already present
         """
-        # Skip if skills_metadata is already present in state (even if empty)
+        # state에 skills_metadata가 이미 있으면(비어 있어도) 스킵
         if "skills_metadata" in state:
             return None
 
-        # Resolve backend (supports both direct instances and factory functions)
+        # backend 해석(인스턴스/팩토리 모두 지원)
         backend = self._get_backend(state, runtime, config)
         all_skills: dict[str, SkillMetadata] = {}
 
-        # Load skills from each source in order
-        # Later sources override earlier ones (last one wins)
+        # source를 순서대로 로드합니다.
+        # 뒤에 오는 source가 앞의 source를 덮어씁니다(last one wins).
         for source_path in self.sources:
             source_skills = await _alist_skills(backend, source_path)
             for skill in source_skills:
@@ -662,7 +660,7 @@ class SkillsMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelResponse:
-        """Inject skills documentation into the system prompt.
+        """System prompt에 skills 섹션을 주입한 뒤 model call을 수행하도록 감쌉니다.
 
         Args:
             request: Model request being processed
@@ -679,7 +677,7 @@ class SkillsMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelResponse:
-        """Inject skills documentation into the system prompt (async version).
+        """(async) System prompt에 skills 섹션을 주입한 뒤 model call을 수행하도록 감쌉니다.
 
         Args:
             request: Model request being processed

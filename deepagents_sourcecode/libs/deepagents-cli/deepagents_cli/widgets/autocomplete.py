@@ -1,4 +1,4 @@
-"""Autocomplete system for @ mentions and / commands.
+"""@ 멘션 및 / 커맨드용 자동완성(Autocomplete) 시스템입니다.
 
 This is a custom implementation that handles trigger-based completion
 for slash commands (/) and file mentions (@).

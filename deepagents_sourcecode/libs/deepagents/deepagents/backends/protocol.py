@@ -1,8 +1,8 @@
-"""Protocol definition for pluggable memory backends.
+"""플러그인 가능한 메모리 백엔드를 위한 프로토콜 정의입니다.
 
-This module defines the BackendProtocol that all backend implementations
-must follow. Backends can store files in different locations (state, filesystem,
-database, etc.) and provide a uniform interface for file operations.
+이 모듈은 모든 백엔드 구현이 따라야 하는 BackendProtocol을 정의합니다.
+백엔드는 다양한 위치(상태, 파일 시스템, 데이터베이스 등)에 파일을 저장할 수 있으며
+파일 작업을 위한 균일한 인터페이스를 제공합니다.
 """
 
 import abc
@@ -15,42 +15,41 @@ from langchain.tools import ToolRuntime
 from typing_extensions import TypedDict
 
 FileOperationError = Literal[
-    "file_not_found",  # Download: file doesn't exist
-    "permission_denied",  # Both: access denied
-    "is_directory",  # Download: tried to download directory as file
-    "invalid_path",  # Both: path syntax malformed (parent dir missing, invalid chars)
+    "file_not_found",  # Download: 파일이 존재하지 않음
+    "permission_denied",  # Both: 접근 거부됨
+    "is_directory",  # Download: 디렉토리를 파일로 다운로드하려고 시도
+    "invalid_path",  # Both: 경로 문법이 잘못되었습니다(상위 디렉토리 누락, 잘못된 문자)
 ]
-"""Standardized error codes for file upload/download operations.
+"""파일 업로드/다운로드 작업을 위한 표준화된 오류 코드입니다.
 
-These represent common, recoverable errors that an LLM can understand and potentially fix:
-- file_not_found: The requested file doesn't exist (download)
-- parent_not_found: The parent directory doesn't exist (upload)
-- permission_denied: Access denied for the operation
-- is_directory: Attempted to download a directory as a file
-- invalid_path: Path syntax is malformed or contains invalid characters
+이는 LLM이 이해하고 잠재적으로 수정할 수 있는 일반적이고 복구 가능한 오류를 나타냅니다:
+- file_not_found: 요청한 파일이 존재하지 않음(다운로드)
+- parent_not_found: 상위 디렉토리가 존재하지 않음(업로드)
+- permission_denied: 작업에 대한 접근 거부됨
+- is_directory: 디렉토리를 파일로 다운로드하려고 시도
+- invalid_path: 경로 문법이 잘못되었거나 잘못된 문자가 포함됨
 """
 
 
 @dataclass
 class FileDownloadResponse:
-    """Result of a single file download operation.
+    """단일 파일 다운로드 작업의 결과입니다.
 
-    The response is designed to allow partial success in batch operations.
-    The errors are standardized using FileOperationError literals
-    for certain recoverable conditions for use cases that involve
-    LLMs performing file operations.
+    이 응답은 배치 작업에서 부분적 성공을 허용하도록 설계되었습니다.
+    오류는 LLM이 파일 작업을 수행하는 사용 사례에서 복구 가능한
+    특정 조건에 대해 FileOperationError 리터럴을 사용하여 표준화됩니다.
 
     Attributes:
-        path: The file path that was requested. Included for easy correlation
-            when processing batch results, especially useful for error messages.
-        content: File contents as bytes on success, None on failure.
-        error: Standardized error code on failure, None on success.
-            Uses FileOperationError literal for structured, LLM-actionable error reporting.
+        path: 요청된 파일 경로입니다. 배치 결과 처리 시 상관관계에 유용하며,
+            특히 오류 메시지에 유용합니다.
+        content: 성공 시 파일 내용(바이트), 실패 시 None.
+        error: 실패 시 표준화된 오류 코드, 성공 시 None.
+            구조화되고 LLM이 조치 가능한 오류 보고를 위해 FileOperationError 리터럴을 사용합니다.
 
     Examples:
-        >>> # Success
+        >>> # 성공
         >>> FileDownloadResponse(path="/app/config.json", content=b"{...}", error=None)
-        >>> # Failure
+        >>> # 실패
         >>> FileDownloadResponse(path="/wrong/path.txt", content=None, error="file_not_found")
     """
 
@@ -61,23 +60,22 @@ class FileDownloadResponse:
 
 @dataclass
 class FileUploadResponse:
-    """Result of a single file upload operation.
+    """단일 파일 업로드 작업의 결과입니다.
 
-    The response is designed to allow partial success in batch operations.
-    The errors are standardized using FileOperationError literals
-    for certain recoverable conditions for use cases that involve
-    LLMs performing file operations.
+    이 응답은 배치 작업에서 부분적 성공을 허용하도록 설계되었습니다.
+    오류는 LLM이 파일 작업을 수행하는 사용 사례에서 복구 가능한
+    특정 조건에 대해 FileOperationError 리터럴을 사용하여 표준화됩니다.
 
     Attributes:
-        path: The file path that was requested. Included for easy correlation
-            when processing batch results and for clear error messages.
-        error: Standardized error code on failure, None on success.
-            Uses FileOperationError literal for structured, LLM-actionable error reporting.
+        path: 요청된 파일 경로입니다. 배치 결과 처리 시 상관관계에 유용하며,
+            명확한 오류 메시지에 도움이 됩니다.
+        error: 실패 시 표준화된 오류 코드, 성공 시 None.
+            구조화되고 LLM이 조치 가능한 오류 보고를 위해 FileOperationError 리터럴을 사용합니다.
 
     Examples:
-        >>> # Success
+        >>> # 성공
         >>> FileUploadResponse(path="/app/data.txt", error=None)
-        >>> # Failure
+        >>> # 실패
         >>> FileUploadResponse(path="/readonly/file.txt", error="permission_denied")
     """
 
@@ -86,10 +84,10 @@ class FileUploadResponse:
 
 
 class FileInfo(TypedDict):
-    """Structured file listing info.
+    """파일 목록 조회 시 사용하는 구조화된 항목 정보입니다.
 
-    Minimal contract used across backends. Only "path" is required.
-    Other fields are best-effort and may be absent depending on backend.
+    백엔드 간 최소 계약(minimal contract)이며, `"path"`만 필수입니다.
+    나머지 필드는 best-effort로 제공되며, 백엔드에 따라 누락될 수 있습니다.
     """
 
     path: str
@@ -99,7 +97,7 @@ class FileInfo(TypedDict):
 
 
 class GrepMatch(TypedDict):
-    """Structured grep match entry."""
+    """grep 매칭 결과(구조화) 엔트리입니다."""
 
     path: str
     line: int
@@ -108,14 +106,15 @@ class GrepMatch(TypedDict):
 
 @dataclass
 class WriteResult:
-    """Result from backend write operations.
+    """백엔드 write 작업의 결과입니다.
 
     Attributes:
-        error: Error message on failure, None on success.
-        path: Absolute path of written file, None on failure.
-        files_update: State update dict for checkpoint backends, None for external storage.
-            Checkpoint backends populate this with {file_path: file_data} for LangGraph state.
-            External backends set None (already persisted to disk/S3/database/etc).
+        error: 실패 시 오류 메시지, 성공 시 `None`.
+        path: 성공 시 작성된 파일의 절대 경로, 실패 시 `None`.
+        files_update: checkpoint 기반 백엔드에서는 state 업데이트 딕셔너리,
+            외부 스토리지 기반 백엔드에서는 `None`.
+            checkpoint 백엔드는 LangGraph state 업데이트를 위해 `{file_path: file_data}`를 채웁니다.
+            외부 백엔드는 `None`(이미 디스크/S3/DB 등에 영구 반영됨)을 사용합니다.
 
     Examples:
         >>> # Checkpoint storage
@@ -133,15 +132,16 @@ class WriteResult:
 
 @dataclass
 class EditResult:
-    """Result from backend edit operations.
+    """백엔드 edit 작업의 결과입니다.
 
     Attributes:
-        error: Error message on failure, None on success.
-        path: Absolute path of edited file, None on failure.
-        files_update: State update dict for checkpoint backends, None for external storage.
-            Checkpoint backends populate this with {file_path: file_data} for LangGraph state.
-            External backends set None (already persisted to disk/S3/database/etc).
-        occurrences: Number of replacements made, None on failure.
+        error: 실패 시 오류 메시지, 성공 시 `None`.
+        path: 성공 시 수정된 파일의 절대 경로, 실패 시 `None`.
+        files_update: checkpoint 기반 백엔드에서는 state 업데이트 딕셔너리,
+            외부 스토리지 기반 백엔드에서는 `None`.
+            checkpoint 백엔드는 LangGraph state 업데이트를 위해 `{file_path: file_data}`를 채웁니다.
+            외부 백엔드는 `None`(이미 디스크/S3/DB 등에 영구 반영됨)을 사용합니다.
+        occurrences: 치환 횟수. 실패 시 `None`.
 
     Examples:
         >>> # Checkpoint storage
@@ -159,36 +159,38 @@ class EditResult:
 
 
 class BackendProtocol(abc.ABC):
-    """Protocol for pluggable memory backends (single, unified).
+    """플러그인 가능한 메모리/파일 백엔드용 단일(unified) 프로토콜입니다.
 
-    Backends can store files in different locations (state, filesystem, database, etc.)
-    and provide a uniform interface for file operations.
+    백엔드는 상태(state), 로컬 파일 시스템, 데이터베이스 등 다양한 위치에 파일을 저장할 수 있으며,
+    파일 작업에 대해 일관된(uniform) 인터페이스를 제공합니다.
 
-    All file data is represented as dicts with the following structure:
+    모든 file data는 아래 구조의 딕셔너리로 표현합니다.
+
+    ```python
     {
-        "content": list[str], # Lines of text content
-        "created_at": str, # ISO format timestamp
-        "modified_at": str, # ISO format timestamp
+        "content": list[str],  # 텍스트 라인 목록
+        "created_at": str,     # ISO 형식 타임스탬프
+        "modified_at": str,    # ISO 형식 타임스탬프
     }
+    ```
     """
 
     def ls_info(self, path: str) -> list["FileInfo"]:
-        """List all files in a directory with metadata.
+        """디렉토리 내 파일/폴더를 메타데이터와 함께 나열합니다.
 
         Args:
-            path: Absolute path to the directory to list. Must start with '/'.
+            path: 나열할 디렉토리의 절대 경로. 반드시 `/`로 시작해야 합니다.
 
         Returns:
-            List of FileInfo dicts containing file metadata:
-
-            - `path` (required): Absolute file path
-            - `is_dir` (optional): True if directory
-            - `size` (optional): File size in bytes
-            - `modified_at` (optional): ISO 8601 timestamp
+            FileInfo 딕셔너리 리스트:
+            - `path` (필수): 절대 경로
+            - `is_dir` (선택): 디렉토리면 `True`
+            - `size` (선택): 바이트 단위 크기
+            - `modified_at` (선택): ISO 8601 타임스탬프
         """
 
     async def als_info(self, path: str) -> list["FileInfo"]:
-        """Async version of ls_info."""
+        """`ls_info`의 async 버전입니다."""
         return await asyncio.to_thread(self.ls_info, path)
 
     def read(
@@ -197,25 +199,25 @@ class BackendProtocol(abc.ABC):
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """Read file content with line numbers.
+        """파일을 읽어 라인 번호가 포함된 문자열로 반환합니다.
 
         Args:
-            file_path: Absolute path to the file to read. Must start with '/'.
-            offset: Line number to start reading from (0-indexed). Default: 0.
-            limit: Maximum number of lines to read. Default: 2000.
+            file_path: 읽을 파일의 절대 경로. 반드시 `/`로 시작해야 합니다.
+            offset: 읽기 시작 라인(0-index). 기본값: 0.
+            limit: 최대 읽기 라인 수. 기본값: 2000.
 
         Returns:
-            String containing file content formatted with line numbers (cat -n format),
-            starting at line 1. Lines longer than 2000 characters are truncated.
+            라인 번호(`cat -n`) 형식으로 포맷된 파일 내용 문자열(라인 번호는 1부터 시작).
+            2000자를 초과하는 라인은 잘립니다.
 
-            Returns an error string if the file doesn't exist or can't be read.
+            파일이 없거나 읽을 수 없으면 오류 문자열을 반환합니다.
 
         !!! note
-            - Use pagination (offset/limit) for large files to avoid context overflow
-            - First scan: `read(path, limit=100)` to see file structure
-            - Read more: `read(path, offset=100, limit=200)` for next section
-            - ALWAYS read a file before editing it
-            - If file exists but is empty, you'll receive a system reminder warning
+            - 큰 파일은 pagination(offset/limit)을 사용해 컨텍스트 오버플로우를 방지하세요.
+            - 첫 스캔: `read(path, limit=100)`으로 구조 파악
+            - 추가 읽기: `read(path, offset=100, limit=200)`으로 다음 구간
+            - 편집 전에는 반드시 파일을 먼저 읽어야 합니다.
+            - 파일이 비어 있으면 system reminder 경고가 반환될 수 있습니다.
         """
 
     async def aread(
@@ -224,7 +226,7 @@ class BackendProtocol(abc.ABC):
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """Async version of read."""
+        """`read`의 async 버전입니다."""
         return await asyncio.to_thread(self.read, file_path, offset, limit)
 
     def grep_raw(
@@ -233,7 +235,7 @@ class BackendProtocol(abc.ABC):
         path: str | None = None,
         glob: str | None = None,
     ) -> list["GrepMatch"] | str:
-        """Search for a literal text pattern in files.
+        """파일에서 리터럴(비정규식) 텍스트 패턴을 검색합니다.
 
         Args:
             pattern: Literal string to search for (NOT regex).
@@ -259,12 +261,12 @@ class BackendProtocol(abc.ABC):
                   - "test[0-9].txt" - search test0.txt, test1.txt, etc.
 
         Returns:
-            On success: list[GrepMatch] with structured results containing:
-                - path: Absolute file path
-                - line: Line number (1-indexed)
-                - text: Full line content containing the match
+            성공 시: 아래 필드를 가진 구조화 결과 `list[GrepMatch]`
+            - path: 절대 파일 경로
+            - line: 라인 번호(1-index)
+            - text: 매칭된 라인의 전체 텍스트
 
-            On error: str with error message (e.g., invalid path, permission denied)
+            실패 시: 오류 메시지 문자열(예: invalid path, permission denied)
         """
 
     async def agrep_raw(
@@ -273,11 +275,11 @@ class BackendProtocol(abc.ABC):
         path: str | None = None,
         glob: str | None = None,
     ) -> list["GrepMatch"] | str:
-        """Async version of grep_raw."""
+        """`grep_raw`의 async 버전입니다."""
         return await asyncio.to_thread(self.grep_raw, pattern, path, glob)
 
     def glob_info(self, pattern: str, path: str = "/") -> list["FileInfo"]:
-        """Find files matching a glob pattern.
+        """Glob 패턴에 매칭되는 파일을 찾습니다.
 
         Args:
             pattern: Glob pattern with wildcards to match file paths.
@@ -291,11 +293,11 @@ class BackendProtocol(abc.ABC):
                   The pattern is applied relative to this path.
 
         Returns:
-            list of FileInfo
+            FileInfo 리스트
         """
 
     async def aglob_info(self, pattern: str, path: str = "/") -> list["FileInfo"]:
-        """Async version of glob_info."""
+        """`glob_info`의 async 버전입니다."""
         return await asyncio.to_thread(self.glob_info, pattern, path)
 
     def write(
@@ -303,7 +305,7 @@ class BackendProtocol(abc.ABC):
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """Write content to a new file in the filesystem, error if file exists.
+        """새 파일을 생성하고 내용을 씁니다(동일 경로 파일이 이미 있으면 오류).
 
         Args:
             file_path: Absolute path where the file should be created.
@@ -319,7 +321,7 @@ class BackendProtocol(abc.ABC):
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """Async version of write."""
+        """`write`의 async 버전입니다."""
         return await asyncio.to_thread(self.write, file_path, content)
 
     def edit(
@@ -329,7 +331,7 @@ class BackendProtocol(abc.ABC):
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """Perform exact string replacements in an existing file.
+        """기존 파일에서 정확한 문자열 매칭 기반 치환을 수행합니다.
 
         Args:
             file_path: Absolute path to the file to edit. Must start with '/'.
@@ -351,11 +353,11 @@ class BackendProtocol(abc.ABC):
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """Async version of edit."""
+        """`edit`의 async 버전입니다."""
         return await asyncio.to_thread(self.edit, file_path, old_string, new_string, replace_all)
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """Upload multiple files to the sandbox.
+        """여러 파일을 샌드박스로 업로드합니다.
 
         This API is designed to allow developers to use it either directly or
         by exposing it to LLMs via custom tools.
@@ -380,11 +382,11 @@ class BackendProtocol(abc.ABC):
         """
 
     async def aupload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """Async version of upload_files."""
+        """`upload_files`의 async 버전입니다."""
         return await asyncio.to_thread(self.upload_files, files)
 
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """Download multiple files from the sandbox.
+        """여러 파일을 샌드박스에서 다운로드합니다.
 
         This API is designed to allow developers to use it either directly or
         by exposing it to LLMs via custom tools.
@@ -399,41 +401,41 @@ class BackendProtocol(abc.ABC):
         """
 
     async def adownload_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """Async version of download_files."""
+        """`download_files`의 async 버전입니다."""
         return await asyncio.to_thread(self.download_files, paths)
 
 
 @dataclass
 class ExecuteResponse:
-    """Result of code execution.
+    """코드 실행 결과입니다.
 
-    Simplified schema optimized for LLM consumption.
+    LLM이 소비하기 좋도록 단순화한 스키마입니다.
     """
 
     output: str
-    """Combined stdout and stderr output of the executed command."""
+    """실행된 커맨드의 stdout+stderr 합쳐진 출력."""
 
     exit_code: int | None = None
-    """The process exit code. 0 indicates success, non-zero indicates failure."""
+    """프로세스 종료 코드. 0은 성공, 0이 아니면 실패."""
 
     truncated: bool = False
-    """Whether the output was truncated due to backend limitations."""
+    """백엔드 제한으로 출력이 잘렸는지 여부."""
 
 
 class SandboxBackendProtocol(BackendProtocol):
-    """Protocol for sandboxed backends with isolated runtime.
+    """격리된 런타임을 제공하는 샌드박스 백엔드용 프로토콜입니다.
 
-    Sandboxed backends run in isolated environments (e.g., separate processes,
-    containers) and communicate via defined interfaces.
+    샌드박스 백엔드는 별도 프로세스/컨테이너 같은 격리된 환경에서 실행되며,
+    정해진 인터페이스를 통해 통신합니다.
     """
 
     def execute(
         self,
         command: str,
     ) -> ExecuteResponse:
-        """Execute a command in the process.
+        """샌드박스 프로세스에서 커맨드를 실행합니다.
 
-        Simplified interface optimized for LLM consumption.
+        LLM 친화적으로 단순화된 인터페이스입니다.
 
         Args:
             command: Full shell command string to execute.
@@ -446,12 +448,12 @@ class SandboxBackendProtocol(BackendProtocol):
         self,
         command: str,
     ) -> ExecuteResponse:
-        """Async version of execute."""
+        """`execute`의 async 버전입니다."""
         return await asyncio.to_thread(self.execute, command)
 
     @property
     def id(self) -> str:
-        """Unique identifier for the sandbox backend instance."""
+        """샌드박스 백엔드 인스턴스의 고유 식별자."""
 
 
 BackendFactory: TypeAlias = Callable[[ToolRuntime], BackendProtocol]

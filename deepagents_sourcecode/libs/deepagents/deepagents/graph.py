@@ -1,4 +1,4 @@
-"""Deepagents come with planning, filesystem, and subagents."""
+"""Deepagents는 계획, 파일 시스템, 서브에이전트 기능을 제공합니다."""
 
 from collections.abc import Callable, Sequence
 from typing import Any
@@ -30,10 +30,10 @@ BASE_AGENT_PROMPT = "In order to complete the objective that the user asks of yo
 
 
 def get_default_model() -> ChatAnthropic:
-    """Get the default model for deep agents.
+    """Deep agents의 기본 모델을 가져옵니다.
 
     Returns:
-        `ChatAnthropic` instance configured with Claude Sonnet 4.5.
+        Claude Sonnet 4.5로 구성된 `ChatAnthropic` 인스턴스.
     """
     return ChatAnthropic(
         model_name="claude-sonnet-4-5-20250929",
@@ -60,56 +60,53 @@ def create_deep_agent(
     name: str | None = None,
     cache: BaseCache | None = None,
 ) -> CompiledStateGraph:
-    """Create a deep agent.
+    """DeepAgent를 생성합니다.
 
-    This agent will by default have access to a tool to write todos (`write_todos`),
-    seven file and execution tools: `ls`, `read_file`, `write_file`, `edit_file`, `glob`, `grep`, `execute`,
-    and a tool to call subagents.
+    이 에이전트는 기본적으로 아래 기능(도구/미들웨어)을 포함합니다.
+    - todo 작성 도구: `write_todos`
+    - 파일/실행 도구: `ls`, `read_file`, `write_file`, `edit_file`, `glob`, `grep`, `execute`
+    - 서브에이전트 호출 도구
 
-    The `execute` tool allows running shell commands if the backend implements `SandboxBackendProtocol`.
-    For non-sandbox backends, the `execute` tool will return an error message.
+    `execute` 도구는 backend가 `SandboxBackendProtocol`을 구현할 때 셸 커맨드를 실행할 수 있습니다.
+    샌드박스가 아닌 backend에서는 `execute`가 오류 메시지를 반환합니다.
 
     Args:
-        model: The model to use. Defaults to `claude-sonnet-4-5-20250929`.
-        tools: The tools the agent should have access to.
-        system_prompt: The additional instructions the agent should have. Will go in
-            the system prompt.
-        middleware: Additional middleware to apply after standard middleware.
-        subagents: The subagents to use.
+        model: 사용할 모델. 기본값은 `claude-sonnet-4-5-20250929`.
+        tools: 에이전트에 추가로 제공할 도구 목록.
+        system_prompt: 에이전트에 추가로 주입할 지침. system prompt에 포함됩니다.
+        middleware: 표준 미들웨어 뒤에 추가로 적용할 미들웨어 목록.
+        subagents: 사용할 서브에이전트 정의 목록.
 
-            Each subagent should be a `dict` with the following keys:
-
+            각 서브에이전트는 아래 키를 가진 `dict` 형태입니다.
             - `name`
-            - `description` (used by the main agent to decide whether to call the sub agent)
-            - `prompt` (used as the system prompt in the subagent)
+            - `description` (메인 에이전트가 어떤 서브에이전트를 호출할지 결정할 때 사용)
+            - `prompt` (서브에이전트의 system prompt로 사용)
             - (optional) `tools`
-            - (optional) `model` (either a `LanguageModelLike` instance or `dict` settings)
-            - (optional) `middleware` (list of `AgentMiddleware`)
-        skills: Optional list of skill source paths (e.g., `["/skills/user/", "/skills/project/"]`).
+            - (optional) `model` (`LanguageModelLike` 인스턴스 또는 설정 `dict`)
+            - (optional) `middleware` (`AgentMiddleware` 리스트)
+        skills: 스킬 소스 경로 목록(예: `["/skills/user/", "/skills/project/"]`) (선택).
 
-            Paths must be specified using POSIX conventions (forward slashes) and are relative
-            to the backend's root. When using `StateBackend` (default), provide skill files via
-            `invoke(files={...})`. With `FilesystemBackend`, skills are loaded from disk relative
-            to the backend's `root_dir`. Later sources override earlier ones for skills with the
-            same name (last one wins).
-        memory: Optional list of memory file paths (`AGENTS.md` files) to load
-            (e.g., `["/memory/AGENTS.md"]`). Display names are automatically derived from paths.
-            Memory is loaded at agent startup and added into the system prompt.
-        response_format: A structured output response format to use for the agent.
-        context_schema: The schema of the deep agent.
-        checkpointer: Optional `Checkpointer` for persisting agent state between runs.
-        store: Optional store for persistent storage (required if backend uses `StoreBackend`).
-        backend: Optional backend for file storage and execution.
+            경로는 POSIX 형식(슬래시 `/`)으로 지정하며 backend root 기준 상대 경로입니다.
+            `StateBackend`(기본값)를 사용할 때는 `invoke(files={...})`로 파일을 제공해야 합니다.
+            `FilesystemBackend`에서는 backend의 `root_dir` 기준으로 디스크에서 스킬을 로드합니다.
+            같은 이름의 스킬이 중복될 경우 뒤에 오는 소스가 우선합니다(last one wins).
+        memory: 로드할 메모리 파일(AGENTS.md) 경로 목록(예: `["/memory/AGENTS.md"]`) (선택).
+            표시 이름은 경로에서 자동 유도되며, 에이전트 시작 시 로드되어 system prompt에 포함됩니다.
+        response_format: 구조화 출력 응답 포맷(선택).
+        context_schema: DeepAgent의 컨텍스트 스키마(선택).
+        checkpointer: 실행 간 state를 저장하기 위한 `Checkpointer`(선택).
+        store: 영구 저장을 위한 store(선택). backend가 `StoreBackend`를 사용할 경우 필요합니다.
+        backend: 파일 저장/실행을 위한 backend(선택).
 
-            Pass either a `Backend` instance or a callable factory like `lambda rt: StateBackend(rt)`.
-            For execution support, use a backend that implements `SandboxBackendProtocol`.
-        interrupt_on: Mapping of tool names to interrupt configs.
-        debug: Whether to enable debug mode. Passed through to `create_agent`.
-        name: The name of the agent. Passed through to `create_agent`.
-        cache: The cache to use for the agent. Passed through to `create_agent`.
+            `Backend` 인스턴스 또는 `lambda rt: StateBackend(rt)` 같은 팩토리 함수를 전달할 수 있습니다.
+            실행 지원이 필요하면 `SandboxBackendProtocol`을 구현한 backend를 사용하세요.
+        interrupt_on: 도구 이름 → interrupt 설정 매핑(선택).
+        debug: debug 모드 활성화 여부. `create_agent`로 전달됩니다.
+        name: 에이전트 이름. `create_agent`로 전달됩니다.
+        cache: 캐시 인스턴스. `create_agent`로 전달됩니다.
 
     Returns:
-        A configured deep agent.
+        설정된(compiled) deep agent 그래프.
     """
     if model is None:
         model = get_default_model()
@@ -128,7 +125,7 @@ def create_deep_agent(
         trigger = ("tokens", 170000)
         keep = ("messages", 6)
 
-    # Build middleware stack for subagents (includes skills if provided)
+    # 서브에이전트용 미들웨어 스택 구성(skills가 있으면 포함)
     subagent_middleware: list[AgentMiddleware] = [
         TodoListMiddleware(),
     ]
@@ -151,7 +148,7 @@ def create_deep_agent(
         ]
     )
 
-    # Build main agent middleware stack
+    # 메인 에이전트 미들웨어 스택 구성
     deepagent_middleware: list[AgentMiddleware] = [
         TodoListMiddleware(),
     ]

@@ -1,9 +1,13 @@
-"""Textual UI application for deepagents-cli."""
+"""deepagents-cli의 Textual UI 애플리케이션입니다.
+
+Textual UI application for deepagents-cli.
+"""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import subprocess
 import uuid
 from pathlib import Path
@@ -30,6 +34,10 @@ from deepagents_cli.widgets.messages import (
 )
 from deepagents_cli.widgets.status import StatusBar
 from deepagents_cli.widgets.welcome import WelcomeBanner
+
+logger = logging.getLogger(__name__)
+
+TOKENS_K_THRESHOLD = 1000
 
 if TYPE_CHECKING:
     from langgraph.pregel import Pregel
@@ -382,41 +390,49 @@ class DeepAgentsApp(App):
         """
         cmd = command.lower().strip()
 
-        if cmd in ("/quit", "/exit", "/q"):
+        if cmd in {"/quit", "/exit", "/q"}:
             self.exit()
-        elif cmd == "/help":
-            await self._mount_message(UserMessage(command))
+            return
+
+        await self._mount_message(UserMessage(command))
+
+        if cmd == "/help":
             await self._mount_message(
                 SystemMessage("Commands: /quit, /clear, /tokens, /threads, /help")
             )
-        elif cmd == "/clear":
+            return
+
+        if cmd == "/clear":
             await self._clear_messages()
             # Reset thread to start fresh conversation
             if self._session_state:
                 new_thread_id = self._session_state.reset_thread()
                 await self._mount_message(SystemMessage(f"Started new session: {new_thread_id}"))
-        elif cmd == "/threads":
-            await self._mount_message(UserMessage(command))
+            return
+
+        if cmd == "/threads":
             if self._session_state:
                 await self._mount_message(
                     SystemMessage(f"Current session: {self._session_state.thread_id}")
                 )
             else:
                 await self._mount_message(SystemMessage("No active session"))
-        elif cmd == "/tokens":
-            await self._mount_message(UserMessage(command))
+            return
+
+        if cmd == "/tokens":
             if self._token_tracker and self._token_tracker.current_context > 0:
                 count = self._token_tracker.current_context
-                if count >= 1000:
-                    formatted = f"{count / 1000:.1f}K"
-                else:
-                    formatted = str(count)
+                formatted = (
+                    f"{count / TOKENS_K_THRESHOLD:.1f}K"
+                    if count >= TOKENS_K_THRESHOLD
+                    else str(count)
+                )
                 await self._mount_message(SystemMessage(f"Current context: {formatted} tokens"))
             else:
                 await self._mount_message(SystemMessage("No token usage yet"))
-        else:
-            await self._mount_message(UserMessage(command))
-            await self._mount_message(SystemMessage(f"Unknown command: {cmd}"))
+            return
+
+        await self._mount_message(SystemMessage(f"Unknown command: {cmd}"))
 
     async def _handle_user_message(self, message: str) -> None:
         """Handle a user message to send to the agent.
@@ -572,8 +588,8 @@ class DeepAgentsApp(App):
                 if tool_msg.has_output:
                     tool_msg.toggle_output()
                     return
-        except Exception:
-            pass
+        except Exception as err:  # noqa: BLE001
+            logger.debug("Failed to toggle tool output.", exc_info=err)
 
     # Approval menu action handlers (delegated from App-level bindings)
     # NOTE: These only activate when approval widget is pending AND input is not focused

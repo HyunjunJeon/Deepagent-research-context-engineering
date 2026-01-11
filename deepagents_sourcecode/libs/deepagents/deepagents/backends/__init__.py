@@ -1,4 +1,4 @@
-"""Memory backends for pluggable file storage."""
+"""플러그인 가능한 파일 저장을 위한 메모리 백엔드입니다."""
 
 from deepagents.backends.composite import CompositeBackend
 from deepagents.backends.filesystem import FilesystemBackend

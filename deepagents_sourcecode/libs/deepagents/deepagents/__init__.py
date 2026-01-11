@@ -1,4 +1,4 @@
-"""DeepAgents package."""
+"""DeepAgents 패키지."""
 
 from deepagents.graph import create_deep_agent
 from deepagents.middleware.filesystem import FilesystemMiddleware

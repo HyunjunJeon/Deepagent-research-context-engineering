@@ -1,8 +1,9 @@
-"""Shared utility functions for memory backend implementations.
+"""메모리 백엔드 구현에서 공용으로 사용하는 유틸리티 함수 모음입니다.
 
-This module contains both user-facing string formatters and structured
-helpers used by backends and the composite router. Structured helpers
-enable composition without fragile string parsing.
+이 모듈에는 (1) 사용자/에이전트에게 보여줄 문자열 포매터와 (2) 백엔드 및
+Composite 라우터에서 사용하는 구조화된 헬퍼가 함께 들어 있습니다.
+구조화 헬퍼를 사용하면 문자열 파싱에 의존하지 않고도 조합(composition)이
+가능해집니다.
 """
 
 import re
@@ -21,15 +22,16 @@ LINE_NUMBER_WIDTH = 6
 TOOL_RESULT_TOKEN_LIMIT = 20000  # Same threshold as eviction
 TRUNCATION_GUIDANCE = "... [results truncated, try being more specific with your parameters]"
 
-# Re-export protocol types for backwards compatibility
+# 하위 호환성을 위해 protocol 타입을 재노출(re-export)합니다.
 FileInfo = _FileInfo
 GrepMatch = _GrepMatch
 
 
 def sanitize_tool_call_id(tool_call_id: str) -> str:
-    r"""Sanitize tool_call_id to prevent path traversal and separator issues.
+    r"""`tool_call_id`를 안전하게 정규화합니다.
 
-    Replaces dangerous characters (., /, \) with underscores.
+    경로 탐색(path traversal)이나 구분자 관련 문제를 피하기 위해 위험한 문자(`.`, `/`, `\`)를
+    밑줄(`_`)로 치환합니다.
     """
     sanitized = tool_call_id.replace(".", "_").replace("/", "_").replace("\\", "_")
     return sanitized
@@ -39,16 +41,16 @@ def format_content_with_line_numbers(
     content: str | list[str],
     start_line: int = 1,
 ) -> str:
-    """Format file content with line numbers (cat -n style).
+    """파일 내용을 라인 번호와 함께 포맷팅합니다(`cat -n` 스타일).
 
-    Chunks lines longer than MAX_LINE_LENGTH with continuation markers (e.g., 5.1, 5.2).
+    `MAX_LINE_LENGTH`를 초과하는 라인은 연속 마커(예: `5.1`, `5.2`)를 붙여 여러 줄로 분할합니다.
 
     Args:
-        content: File content as string or list of lines
-        start_line: Starting line number (default: 1)
+        content: 문자열 또는 라인 리스트 형태의 파일 내용
+        start_line: 시작 라인 번호(기본값: 1)
 
     Returns:
-        Formatted content with line numbers and continuation markers
+        라인 번호와 연속 마커가 포함된 포맷 문자열
     """
     if isinstance(content, str):
         lines = content.split("\n")
@@ -64,17 +66,17 @@ def format_content_with_line_numbers(
         if len(line) <= MAX_LINE_LENGTH:
             result_lines.append(f"{line_num:{LINE_NUMBER_WIDTH}d}\t{line}")
         else:
-            # Split long line into chunks with continuation markers
+            # 긴 라인을 여러 조각으로 분할하고 연속 마커를 부여합니다.
             num_chunks = (len(line) + MAX_LINE_LENGTH - 1) // MAX_LINE_LENGTH
             for chunk_idx in range(num_chunks):
                 start = chunk_idx * MAX_LINE_LENGTH
                 end = min(start + MAX_LINE_LENGTH, len(line))
                 chunk = line[start:end]
                 if chunk_idx == 0:
-                    # First chunk: use normal line number
+                    # 첫 번째 조각: 일반 라인 번호 사용
                     result_lines.append(f"{line_num:{LINE_NUMBER_WIDTH}d}\t{chunk}")
                 else:
-                    # Continuation chunks: use decimal notation (e.g., 5.1, 5.2)
+                    # 후속 조각: 소수 표기(예: 5.1, 5.2)
                     continuation_marker = f"{line_num}.{chunk_idx}"
                     result_lines.append(f"{continuation_marker:>{LINE_NUMBER_WIDTH}}\t{chunk}")
 
@@ -82,13 +84,13 @@ def format_content_with_line_numbers(
 
 
 def check_empty_content(content: str) -> str | None:
-    """Check if content is empty and return warning message.
+    """콘텐츠가 비어 있는지 확인하고, 비어 있으면 경고 메시지를 반환합니다.
 
     Args:
-        content: Content to check
+        content: 확인할 콘텐츠
 
     Returns:
-        Warning message if empty, None otherwise
+        비어 있으면 경고 메시지, 아니면 `None`
     """
     if not content or content.strip() == "":
         return EMPTY_CONTENT_WARNING
@@ -96,26 +98,26 @@ def check_empty_content(content: str) -> str | None:
 
 
 def file_data_to_string(file_data: dict[str, Any]) -> str:
-    """Convert FileData to plain string content.
+    """FileData 딕셔너리를 일반 문자열 콘텐츠로 변환합니다.
 
     Args:
-        file_data: FileData dict with 'content' key
+        file_data: `'content'` 키를 포함한 FileData 딕셔너리
 
     Returns:
-        Content as string with lines joined by newlines
+        줄바꿈으로 합쳐진 문자열 콘텐츠
     """
     return "\n".join(file_data["content"])
 
 
 def create_file_data(content: str, created_at: str | None = None) -> dict[str, Any]:
-    """Create a FileData object with timestamps.
+    """타임스탬프를 포함한 FileData 딕셔너리를 생성합니다.
 
     Args:
-        content: File content as string
-        created_at: Optional creation timestamp (ISO format)
+        content: 파일 내용(문자열)
+        created_at: 생성 시각(ISO 형식) 오버라이드(선택)
 
     Returns:
-        FileData dict with content and timestamps
+        content/created_at/modified_at를 포함한 FileData 딕셔너리
     """
     lines = content.split("\n") if isinstance(content, str) else content
     now = datetime.now(UTC).isoformat()
@@ -128,14 +130,14 @@ def create_file_data(content: str, created_at: str | None = None) -> dict[str, A
 
 
 def update_file_data(file_data: dict[str, Any], content: str) -> dict[str, Any]:
-    """Update FileData with new content, preserving creation timestamp.
+    """기존 FileData의 생성 시각을 유지하면서 내용을 업데이트합니다.
 
     Args:
-        file_data: Existing FileData dict
-        content: New content as string
+        file_data: 기존 FileData 딕셔너리
+        content: 새 콘텐츠(문자열)
 
     Returns:
-        Updated FileData dict
+        업데이트된 FileData 딕셔너리
     """
     lines = content.split("\n") if isinstance(content, str) else content
     now = datetime.now(UTC).isoformat()
@@ -152,15 +154,15 @@ def format_read_response(
     offset: int,
     limit: int,
 ) -> str:
-    """Format file data for read response with line numbers.
+    """`read` 응답을 라인 번호와 함께 포맷팅합니다.
 
     Args:
-        file_data: FileData dict
-        offset: Line offset (0-indexed)
-        limit: Maximum number of lines
+        file_data: FileData 딕셔너리
+        offset: 라인 오프셋(0-index)
+        limit: 최대 라인 수
 
     Returns:
-        Formatted content or error message
+        포맷된 콘텐츠 또는 오류 메시지
     """
     content = file_data_to_string(file_data)
     empty_msg = check_empty_content(content)
@@ -184,16 +186,16 @@ def perform_string_replacement(
     new_string: str,
     replace_all: bool,
 ) -> tuple[str, int] | str:
-    """Perform string replacement with occurrence validation.
+    """문자열 치환을 수행하고, 치환 대상 문자열의 출현 횟수를 검증합니다.
 
     Args:
-        content: Original content
-        old_string: String to replace
-        new_string: Replacement string
-        replace_all: Whether to replace all occurrences
+        content: 원본 콘텐츠
+        old_string: 치환할 문자열
+        new_string: 대체 문자열
+        replace_all: 모든 출현을 치환할지 여부
 
     Returns:
-        Tuple of (new_content, occurrences) on success, or error message string
+        성공 시 `(new_content, occurrences)` 튜플, 실패 시 오류 메시지 문자열
     """
     occurrences = content.count(old_string)
 
@@ -208,7 +210,7 @@ def perform_string_replacement(
 
 
 def truncate_if_too_long(result: list[str] | str) -> list[str] | str:
-    """Truncate list or string result if it exceeds token limit (rough estimate: 4 chars/token)."""
+    """토큰 제한을 초과하는 결과를 잘라냅니다(대략 4 chars/token 기준)."""
     if isinstance(result, list):
         total_chars = sum(len(item) for item in result)
         if total_chars > TOOL_RESULT_TOKEN_LIMIT * 4:
@@ -221,16 +223,16 @@ def truncate_if_too_long(result: list[str] | str) -> list[str] | str:
 
 
 def _validate_path(path: str | None) -> str:
-    """Validate and normalize a path.
+    """경로를 검증하고 정규화합니다.
 
     Args:
-        path: Path to validate
+        path: 검증할 경로
 
     Returns:
-        Normalized path starting with /
+        `/`로 시작하고 `/`로 끝나는 정규화된 경로
 
     Raises:
-        ValueError: If path is invalid
+        ValueError: 경로가 유효하지 않은 경우
     """
     path = path or "/"
     if not path or path.strip() == "":
@@ -249,7 +251,7 @@ def _glob_search_files(
     pattern: str,
     path: str = "/",
 ) -> str:
-    """Search files dict for paths matching glob pattern.
+    """in-memory 파일 맵에서 glob 패턴에 매칭되는 경로를 찾습니다.
 
     Args:
         files: Dictionary of file paths to FileData.
@@ -274,10 +276,9 @@ def _glob_search_files(
 
     filtered = {fp: fd for fp, fd in files.items() if fp.startswith(normalized_path)}
 
-    # Respect standard glob semantics:
-    # - Patterns without path separators (e.g., "*.py") match only in the current
-    #   directory (non-recursive) relative to `path`.
-    # - Use "**" explicitly for recursive matching.
+    # 표준 glob semantics를 따릅니다.
+    # - path separator가 없는 패턴(예: "*.py")은 `path` 기준 현재 디렉토리(비재귀)만 매칭합니다.
+    # - 재귀 매칭이 필요하면 "**"를 명시적으로 사용해야 합니다.
     effective_pattern = pattern
 
     matches = []
@@ -301,7 +302,7 @@ def _format_grep_results(
     results: dict[str, list[tuple[int, str]]],
     output_mode: Literal["files_with_matches", "content", "count"],
 ) -> str:
-    """Format grep search results based on output mode.
+    """Output mode에 따라 grep 검색 결과를 포맷팅합니다.
 
     Args:
         results: Dictionary mapping file paths to list of (line_num, line_content) tuples
@@ -333,7 +334,7 @@ def _grep_search_files(
     glob: str | None = None,
     output_mode: Literal["files_with_matches", "content", "count"] = "files_with_matches",
 ) -> str:
-    """Search file contents for regex pattern.
+    """파일 내용에서 정규식 패턴을 검색합니다.
 
     Args:
         files: Dictionary of file paths to FileData.
@@ -380,7 +381,7 @@ def _grep_search_files(
     return _format_grep_results(results, output_mode)
 
 
-# -------- Structured helpers for composition --------
+# -------- 조합(composition)을 위한 구조화 헬퍼 --------
 
 
 def grep_matches_from_files(
@@ -389,11 +390,11 @@ def grep_matches_from_files(
     path: str | None = None,
     glob: str | None = None,
 ) -> list[GrepMatch] | str:
-    """Return structured grep matches from an in-memory files mapping.
+    """in-memory 파일 맵에서 구조화된 grep 매칭을 반환합니다.
 
-    Returns a list of GrepMatch on success, or a string for invalid inputs
-    (e.g., invalid regex). We deliberately do not raise here to keep backends
-    non-throwing in tool contexts and preserve user-facing error messages.
+    성공 시 `list[GrepMatch]`를, 입력이 유효하지 않은 경우(예: 잘못된 정규식)는 오류 문자열을 반환합니다.
+    백엔드가 도구(tool) 컨텍스트에서 예외를 던지지 않도록 하고, 사용자/에이전트에게 보여줄 오류 메시지를
+    유지하기 위해 의도적으로 raise 하지 않습니다.
     """
     try:
         regex = re.compile(pattern)
@@ -419,7 +420,7 @@ def grep_matches_from_files(
 
 
 def build_grep_results_dict(matches: list[GrepMatch]) -> dict[str, list[tuple[int, str]]]:
-    """Group structured matches into the legacy dict form used by formatters."""
+    """구조화 매칭을 기존(formatter) 호환 dict 형태로 그룹화합니다."""
     grouped: dict[str, list[tuple[int, str]]] = {}
     for m in matches:
         grouped.setdefault(m["path"], []).append((m["line"], m["text"]))
@@ -430,7 +431,7 @@ def format_grep_matches(
     matches: list[GrepMatch],
     output_mode: Literal["files_with_matches", "content", "count"],
 ) -> str:
-    """Format structured grep matches using existing formatting logic."""
+    """기존 포맷팅 로직을 이용해 구조화 grep 매칭을 문자열로 포맷팅합니다."""
     if not matches:
         return "No matches found"
     return _format_grep_results(build_grep_results_dict(matches), output_mode)

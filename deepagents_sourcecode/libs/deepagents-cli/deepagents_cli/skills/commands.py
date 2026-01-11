@@ -1,4 +1,4 @@
-"""CLI commands for skill management.
+"""CLI에서 스킬(skills)을 관리하기 위한 커맨드들입니다.
 
 These commands are registered with the CLI via cli.py:
 - deepagents skills list --agent <agent> [--project]
@@ -9,7 +9,6 @@ These commands are registered with the CLI via cli.py:
 import argparse
 import re
 from pathlib import Path
-from typing import Any
 
 from deepagents_cli.config import COLORS, Settings, console
 from deepagents_cli.skills.load import list_skills
@@ -71,22 +70,14 @@ def _validate_skill_path(skill_dir: Path, base_dir: Path) -> tuple[bool, str]:
         # Resolve both paths to their canonical form
         resolved_skill = skill_dir.resolve()
         resolved_base = base_dir.resolve()
-
-        # Check if skill_dir is within base_dir
-        # Use is_relative_to if available (Python 3.9+), otherwise use string comparison
-        if hasattr(resolved_skill, "is_relative_to"):
-            if not resolved_skill.is_relative_to(resolved_base):
-                return False, f"Skill directory must be within {base_dir}"
-        else:
-            # Fallback for older Python versions
-            try:
-                resolved_skill.relative_to(resolved_base)
-            except ValueError:
-                return False, f"Skill directory must be within {base_dir}"
-
-        return True, ""
     except (OSError, RuntimeError) as e:
         return False, f"Invalid path: {e}"
+
+    # Check if skill_dir is within base_dir (Python 3.9+)
+    if not resolved_skill.is_relative_to(resolved_base):
+        return False, f"Skill directory must be within {base_dir}"
+
+    return True, ""
 
 
 def _list(agent: str, *, project: bool = False) -> None:
@@ -114,11 +105,17 @@ def _list(agent: str, *, project: bool = False) -> None:
         if not project_skills_dir.exists() or not any(project_skills_dir.iterdir()):
             console.print("[yellow]No project skills found.[/yellow]")
             console.print(
-                f"[dim]Project skills will be created in {project_skills_dir}/ when you add them.[/dim]",
+                (
+                    f"[dim]Project skills will be created in {project_skills_dir}/ "
+                    "when you add them.[/dim]"
+                ),
                 style=COLORS["dim"],
             )
             console.print(
-                "\n[dim]Create a project skill:\n  deepagents skills create my-skill --project[/dim]",
+                (
+                    "\n[dim]Create a project skill:\n"
+                    "  deepagents skills create my-skill --project[/dim]"
+                ),
                 style=COLORS["dim"],
             )
             return
@@ -127,12 +124,18 @@ def _list(agent: str, *, project: bool = False) -> None:
         console.print("\n[bold]Project Skills:[/bold]\n", style=COLORS["primary"])
     else:
         # Load both user and project skills
-        skills = list_skills(user_skills_dir=user_skills_dir, project_skills_dir=project_skills_dir)
+        skills = list_skills(
+            user_skills_dir=user_skills_dir,
+            project_skills_dir=project_skills_dir,
+        )
 
         if not skills:
             console.print("[yellow]No skills found.[/yellow]")
             console.print(
-                "[dim]Skills will be created in ~/.deepagents/agent/skills/ when you add them.[/dim]",
+                (
+                    "[dim]Skills will be created in ~/.deepagents/agent/skills/ "
+                    "when you add them.[/dim]"
+                ),
                 style=COLORS["dim"],
             )
             console.print(
@@ -170,7 +173,7 @@ def _list(agent: str, *, project: bool = False) -> None:
             console.print()
 
 
-def _create(skill_name: str, agent: str, project: bool = False) -> None:
+def _create(skill_name: str, agent: str, *, project: bool = False) -> None:
     """Create a new skill with a template SKILL.md file.
 
     Args:
@@ -325,7 +328,8 @@ def _info(skill_name: str, *, agent: str = "agent", project: bool = False) -> No
     Args:
         skill_name: Name of the skill to show info for.
         agent: Agent identifier for skills (default: agent).
-        project: If True, only search in project skills. If False, search in both user and project skills.
+        project: If True, only search in project skills.
+            If False, search in both user and project skills.
     """
     settings = Settings.from_environment()
     user_skills_dir = settings.get_user_skills_dir(agent)
@@ -359,7 +363,10 @@ def _info(skill_name: str, *, agent: str = "agent", project: bool = False) -> No
     source_color = "green" if skill["source"] == "project" else "cyan"
 
     console.print(
-        f"\n[bold]Skill: {skill['name']}[/bold] [bold {source_color}]({source_label})[/bold {source_color}]\n",
+        (
+            f"\n[bold]Skill: {skill['name']}[/bold] "
+            f"[bold {source_color}]({source_label})[/bold {source_color}]\n"
+        ),
         style=COLORS["primary"],
     )
     console.print(f"[bold]Description:[/bold] {skill['description']}\n", style=COLORS["dim"])
@@ -382,7 +389,7 @@ def _info(skill_name: str, *, agent: str = "agent", project: bool = False) -> No
 
 
 def setup_skills_parser(
-    subparsers: Any,
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> argparse.ArgumentParser:
     """Setup the skills subcommand parser with all its subcommands."""
     skills_parser = subparsers.add_parser(
@@ -394,7 +401,9 @@ def setup_skills_parser(
 
     # Skills list
     list_parser = skills_subparsers.add_parser(
-        "list", help="List all available skills", description="List all available skills"
+        "list",
+        help="List all available skills",
+        description="List all available skills",
     )
     list_parser.add_argument(
         "--agent",
@@ -457,7 +466,10 @@ def execute_skills_command(args: argparse.Namespace) -> None:
         if not is_valid:
             console.print(f"[bold red]Error:[/bold red] Invalid agent name: {error_msg}")
             console.print(
-                "[dim]Agent names must only contain letters, numbers, hyphens, and underscores.[/dim]",
+                (
+                    "[dim]Agent names must only contain letters, numbers, hyphens, "
+                    "and underscores.[/dim]"
+                ),
                 style=COLORS["dim"],
             )
             return

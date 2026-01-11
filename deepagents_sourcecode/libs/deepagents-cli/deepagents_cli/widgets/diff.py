@@ -1,4 +1,7 @@
-"""Enhanced diff widget for displaying unified diffs."""
+"""unified diff를 표시하기 위한 확장(diff) 위젯입니다.
+
+Enhanced diff widget for displaying unified diffs.
+"""
 
 from __future__ import annotations
 
@@ -25,7 +28,7 @@ def _escape_markup(text: str) -> str:
     return text.replace("[", r"\[").replace("]", r"\]")
 
 
-def format_diff_textual(diff: str, max_lines: int | None = 100) -> str:
+def format_diff_textual(diff: str, max_lines: int | None = 100) -> str:  # noqa: PLR0912
     """Format a unified diff with line numbers and colors.
 
     Args:

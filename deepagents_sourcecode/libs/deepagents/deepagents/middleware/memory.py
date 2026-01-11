@@ -1,23 +1,22 @@
-"""Middleware for loading agent memory/context from AGENTS.md files.
+"""AGENTS.md 파일로부터 에이전트 메모리/컨텍스트를 로드하는 미들웨어입니다.
 
-This module implements support for the AGENTS.md specification (https://agents.md/),
-loading memory/context from configurable sources and injecting into the system prompt.
+이 모듈은 AGENTS.md 사양(https://agents.md/)을 지원하여, 설정된 소스에서 메모리/컨텍스트를
+읽어들인 다음 system prompt에 주입(inject)합니다.
 
-## Overview
+## 개요
 
-AGENTS.md files provide project-specific context and instructions to help AI agents
-work effectively. Unlike skills (which are on-demand workflows), memory is always
-loaded and provides persistent context.
+AGENTS.md는 프로젝트별 맥락과 지침을 제공하여 AI 에이전트가 더 안정적으로 작업하도록 돕습니다.
+스킬(skills)이 “필요할 때만(on-demand) 호출되는 워크플로”라면, 메모리(memory)는 항상 로드되어
+지속적인(persistent) 컨텍스트를 제공합니다.
 
-## Usage
+## 사용 예시
 
 ```python
 from deepagents import MemoryMiddleware
 from deepagents.backends.filesystem import FilesystemBackend
 
-# Security: FilesystemBackend allows reading/writing from the entire filesystem.
-# Either ensure the agent is running within a sandbox OR add human-in-the-loop (HIL)
-# approval to file operations.
+# 보안 주의: FilesystemBackend는 전체 파일시스템에 대한 읽기/쓰기 권한을 가질 수 있습니다.
+# 에이전트가 샌드박스에서 실행되도록 하거나, 파일 작업에 human-in-the-loop(HIL) 승인을 붙이세요.
 backend = FilesystemBackend(root_dir="/")
 
 middleware = MemoryMiddleware(
@@ -31,20 +30,18 @@ middleware = MemoryMiddleware(
 agent = create_deep_agent(middleware=[middleware])
 ```
 
-## Memory Sources
+## 메모리 소스(Memory Sources)
 
-Sources are simply paths to AGENTS.md files that are loaded in order and combined.
-Multiple sources are concatenated in order, with all content included.
-Later sources appear after earlier ones in the combined prompt.
+소스는 로드할 AGENTS.md 파일 경로 리스트입니다. 소스는 지정된 순서대로 읽혀 하나로 결합되며,
+뒤에 오는 소스가 결합된 프롬프트의 뒤쪽에 붙습니다.
 
-## File Format
+## 파일 형식
 
-AGENTS.md files are standard Markdown with no required structure.
-Common sections include:
-- Project overview
-- Build/test commands
-- Code style guidelines
-- Architecture notes
+AGENTS.md는 일반적인 Markdown이며 필수 구조는 없습니다. 관례적으로는 아래 섹션이 자주 포함됩니다.
+- 프로젝트 개요
+- 빌드/테스트 명령
+- 코드 스타일 가이드
+- 아키텍처 노트
 """
 
 from __future__ import annotations
@@ -73,18 +70,18 @@ logger = logging.getLogger(__name__)
 
 
 class MemoryState(AgentState):
-    """State schema for MemoryMiddleware.
+    """MemoryMiddleware의 state 스키마입니다.
 
     Attributes:
-        memory_contents: Dict mapping source paths to their loaded content.
-            Marked as private so it's not included in the final agent state.
+        memory_contents: 소스 경로 → 로드된 콘텐츠 매핑.
+            최종 agent state에 포함되지 않도록 private로 표시됩니다.
     """
 
     memory_contents: NotRequired[Annotated[dict[str, str], PrivateStateAttr]]
 
 
 class MemoryStateUpdate(TypedDict):
-    """State update for MemoryMiddleware."""
+    """MemoryMiddleware의 state 업데이트 타입입니다."""
 
     memory_contents: dict[str, str]
 
@@ -152,14 +149,14 @@ MEMORY_SYSTEM_PROMPT = """<agent_memory>
 
 
 class MemoryMiddleware(AgentMiddleware):
-    """Middleware for loading agent memory from AGENTS.md files.
+    """AGENTS.md 파일에서 에이전트 메모리를 로드하는 미들웨어입니다.
 
-    Loads memory content from configured sources and injects into the system prompt.
-    Supports multiple sources that are combined together.
+    설정된 소스에서 메모리를 로드한 뒤 system prompt에 주입합니다.
+    여러 소스를 결합하여 한 번에 주입하는 구성을 지원합니다.
 
     Args:
-        backend: Backend instance or factory function for file operations.
-        sources: List of MemorySource configurations specifying paths and names.
+        backend: 파일 작업을 위한 backend 인스턴스 또는 팩토리 함수.
+        sources: 로드할 AGENTS.md 파일 경로 리스트.
     """
 
     state_schema = MemoryState
@@ -170,31 +167,21 @@ class MemoryMiddleware(AgentMiddleware):
         backend: BACKEND_TYPES,
         sources: list[str],
     ) -> None:
-        """Initialize the memory middleware.
+        """메모리 미들웨어를 초기화합니다.
 
         Args:
-            backend: Backend instance or factory function that takes runtime
-                     and returns a backend. Use a factory for StateBackend.
-            sources: List of memory file paths to load (e.g., ["~/.deepagents/AGENTS.md",
-                     "./.deepagents/AGENTS.md"]). Display names are automatically derived
-                     from the paths. Sources are loaded in order.
+            backend: backend 인스턴스 또는 (runtime을 받아 backend를 만드는) 팩토리 함수.
+                `StateBackend`를 사용하려면 팩토리 형태로 전달해야 합니다.
+            sources: 로드할 메모리 파일 경로 리스트(예: `["~/.deepagents/AGENTS.md", "./.deepagents/AGENTS.md"]`).
+                표시 이름은 경로로부터 자동 유도됩니다. 소스는 지정 순서대로 로드됩니다.
         """
         self._backend = backend
         self.sources = sources
 
     def _get_backend(self, state: MemoryState, runtime: Runtime, config: RunnableConfig) -> BackendProtocol:
-        """Resolve backend from instance or factory.
-
-        Args:
-            state: Current agent state.
-            runtime: Runtime context for factory functions.
-            config: Runnable config to pass to backend factory.
-
-        Returns:
-            Resolved backend instance.
-        """
+        """Backend를 인스턴스 또는 팩토리로부터 해석(resolve)합니다."""
         if callable(self._backend):
-            # Construct an artificial tool runtime to resolve backend factory
+            # backend 팩토리를 호출하기 위한 ToolRuntime을 구성합니다.
             tool_runtime = ToolRuntime(
                 state=state,
                 context=runtime.context,
@@ -207,14 +194,7 @@ class MemoryMiddleware(AgentMiddleware):
         return self._backend
 
     def _format_agent_memory(self, contents: dict[str, str]) -> str:
-        """Format memory with locations and contents paired together.
-
-        Args:
-            contents: Dict mapping source paths to content.
-
-        Returns:
-            Formatted string with location+content pairs wrapped in <agent_memory> tags.
-        """
+        """메모리 소스 경로와 콘텐츠를 짝지어 포맷팅합니다."""
         if not contents:
             return MEMORY_SYSTEM_PROMPT.format(agent_memory="(No memory loaded)")
 
@@ -234,27 +214,19 @@ class MemoryMiddleware(AgentMiddleware):
         backend: BackendProtocol,
         path: str,
     ) -> str | None:
-        """Load memory content from a backend path.
-
-        Args:
-            backend: Backend to load from.
-            path: Path to the AGENTS.md file.
-
-        Returns:
-            File content if found, None otherwise.
-        """
+        """backend에서 특정 경로의 메모리(AGENTS.md) 콘텐츠를 로드합니다."""
         results = await backend.adownload_files([path])
-        # Should get exactly one response for one path
+        # 단일 path에 대해 단일 응답이 와야 합니다.
         if len(results) != 1:
             raise AssertionError(f"Expected 1 response for path {path}, got {len(results)}")
         response = results[0]
 
         if response.error is not None:
-            # For now, memory files are treated as optional. file_not_found is expected
-            # and we skip silently to allow graceful degradation.
+            # 현재는 메모리 파일을 optional로 취급합니다.
+            # file_not_found는 정상적으로 발생할 수 있으므로 조용히 스킵하여 점진적 저하(graceful degradation)를 허용합니다.
             if response.error == "file_not_found":
                 return None
-            # Other errors should be raised
+            # 그 외 오류는 예외로 올립니다.
             raise ValueError(f"Failed to download {path}: {response.error}")
 
         if response.content is not None:
@@ -267,7 +239,7 @@ class MemoryMiddleware(AgentMiddleware):
         backend: BackendProtocol,
         path: str,
     ) -> str | None:
-        """Load memory content from a backend path synchronously.
+        """backend에서 특정 경로의 메모리(AGENTS.md) 콘텐츠를 동기로 로드합니다.
 
         Args:
             backend: Backend to load from.
@@ -277,17 +249,17 @@ class MemoryMiddleware(AgentMiddleware):
             File content if found, None otherwise.
         """
         results = backend.download_files([path])
-        # Should get exactly one response for one path
+        # 단일 path에 대해 단일 응답이 와야 합니다.
         if len(results) != 1:
             raise AssertionError(f"Expected 1 response for path {path}, got {len(results)}")
         response = results[0]
 
         if response.error is not None:
-            # For now, memory files are treated as optional. file_not_found is expected
-            # and we skip silently to allow graceful degradation.
+            # 현재는 메모리 파일을 optional로 취급합니다.
+            # file_not_found는 정상적으로 발생할 수 있으므로 조용히 스킵하여 점진적 저하(graceful degradation)를 허용합니다.
             if response.error == "file_not_found":
                 return None
-            # Other errors should be raised
+            # 그 외 오류는 예외로 올립니다.
             raise ValueError(f"Failed to download {path}: {response.error}")
 
         if response.content is not None:
@@ -296,7 +268,7 @@ class MemoryMiddleware(AgentMiddleware):
         return None
 
     def before_agent(self, state: MemoryState, runtime: Runtime, config: RunnableConfig) -> MemoryStateUpdate | None:
-        """Load memory content before agent execution (synchronous).
+        """에이전트 실행 전에 메모리 콘텐츠를 로드합니다(동기).
 
         Loads memory from all configured sources and stores in state.
         Only loads if not already present in state.
@@ -309,7 +281,7 @@ class MemoryMiddleware(AgentMiddleware):
         Returns:
             State update with memory_contents populated.
         """
-        # Skip if already loaded
+        # 이미 로드되어 있으면 스킵
         if "memory_contents" in state:
             return None
 
@@ -325,7 +297,7 @@ class MemoryMiddleware(AgentMiddleware):
         return MemoryStateUpdate(memory_contents=contents)
 
     async def abefore_agent(self, state: MemoryState, runtime: Runtime, config: RunnableConfig) -> MemoryStateUpdate | None:
-        """Load memory content before agent execution.
+        """에이전트 실행 전에 메모리 콘텐츠를 로드합니다(async).
 
         Loads memory from all configured sources and stores in state.
         Only loads if not already present in state.
@@ -338,7 +310,7 @@ class MemoryMiddleware(AgentMiddleware):
         Returns:
             State update with memory_contents populated.
         """
-        # Skip if already loaded
+        # 이미 로드되어 있으면 스킵
         if "memory_contents" in state:
             return None
 
@@ -354,7 +326,7 @@ class MemoryMiddleware(AgentMiddleware):
         return MemoryStateUpdate(memory_contents=contents)
 
     def modify_request(self, request: ModelRequest) -> ModelRequest:
-        """Inject memory content into the system prompt.
+        """메모리 콘텐츠를 system prompt에 주입합니다.
 
         Args:
             request: Model request to modify.
@@ -377,7 +349,7 @@ class MemoryMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelResponse:
-        """Wrap model call to inject memory into system prompt.
+        """System prompt에 메모리를 주입한 뒤 model call을 수행하도록 감쌉니다.
 
         Args:
             request: Model request being processed.
@@ -394,7 +366,7 @@ class MemoryMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelResponse:
-        """Async wrap model call to inject memory into system prompt.
+        """(async) system prompt에 메모리를 주입한 뒤 model call을 수행하도록 감쌉니다.
 
         Args:
             request: Model request being processed.

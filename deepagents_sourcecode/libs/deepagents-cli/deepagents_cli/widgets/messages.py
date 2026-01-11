@@ -1,4 +1,7 @@
-"""Message widgets for deepagents-cli."""
+"""deepagents-cli에서 메시지(대화/툴 호출 등)를 표시하는 위젯 모음입니다.
+
+Message widgets for deepagents-cli.
+"""
 
 from __future__ import annotations
 
@@ -7,13 +10,13 @@ from typing import TYPE_CHECKING, Any
 from textual.containers import Vertical
 from textual.css.query import NoMatches
 from textual.widgets import Markdown, Static
-from textual.widgets._markdown import MarkdownStream
 
 from deepagents_cli.ui import format_tool_display
 from deepagents_cli.widgets.diff import format_diff_textual
 
 if TYPE_CHECKING:
     from textual.app import ComposeResult
+    from textual.widgets._markdown import MarkdownStream
 
 # Maximum number of tool arguments to display inline
 _MAX_INLINE_ARGS = 3

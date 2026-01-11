@@ -1,4 +1,4 @@
-"""A wrapper for DeepAgents to run in Harbor environments."""
+"""Harbor 환경에서 DeepAgents를 실행하기 위한 래퍼(wrapper)입니다."""
 
 import json
 import os
@@ -7,14 +7,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from deepagents import create_deep_agent
+from deepagents_cli.agent import create_cli_agent
 from dotenv import load_dotenv
 from harbor.agents.base import BaseAgent
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
-
-# Load .env file if present
-load_dotenv()
-from deepagents_cli.agent import create_cli_agent
 from harbor.models.trajectories import (
     Agent,
     FinalMetrics,
@@ -32,6 +29,9 @@ from langsmith import trace
 
 from deepagents_harbor.backend import HarborSandbox
 from deepagents_harbor.tracing import create_example_id_from_instruction
+
+# .env 파일이 있으면 로드합니다.
+load_dotenv()
 
 SYSTEM_MESSAGE = """
 You are an autonomous agent executing tasks in a sandboxed environment. Follow these instructions carefully.
@@ -53,9 +53,9 @@ Your current working directory is:
 
 
 class DeepAgentsWrapper(BaseAgent):
-    """Harbor agent implementation using LangChain DeepAgents.
+    """LangChain DeepAgents를 이용한 Harbor 에이전트 구현체입니다.
 
-    Wraps DeepAgents to execute tasks in Harbor environments.
+    Harbor 환경에서 DeepAgents로 작업을 실행할 수 있도록 감쌉니다.
     """
 
     def __init__(
@@ -68,7 +68,7 @@ class DeepAgentsWrapper(BaseAgent):
         *args,
         **kwargs,
     ) -> None:
-        """Initialize DeepAgentsWrapper.
+        """DeepAgentsWrapper를 초기화합니다.
 
         Args:
             logs_dir: Directory for storing logs
@@ -99,7 +99,7 @@ class DeepAgentsWrapper(BaseAgent):
         return "deepagent-harbor"
 
     async def setup(self, environment: BaseEnvironment) -> None:
-        """Setup the agent with the given environment.
+        """주어진 environment로 에이전트를 설정합니다.
 
         Args:
             environment: Harbor environment (Docker, Modal, etc.)
@@ -107,11 +107,11 @@ class DeepAgentsWrapper(BaseAgent):
         pass
 
     def version(self) -> str | None:
-        """The version of the agent."""
+        """에이전트 버전을 반환합니다."""
         return "0.0.1"
 
     async def _get_formatted_system_prompt(self, backend: HarborSandbox) -> str:
-        """Format the system prompt with current directory and file listing context.
+        """현재 디렉토리/파일 목록 컨텍스트를 포함하도록 system prompt를 포맷팅합니다.
 
         Args:
             backend: Harbor sandbox backend to query for directory information
@@ -126,7 +126,6 @@ class DeepAgentsWrapper(BaseAgent):
         # Get first 10 files
         total_files = len(ls_info) if ls_info else 0
         first_10_files = ls_info[:10] if ls_info else []
-        has_more = total_files > 10
 
         # Build file listing header based on actual count
         if total_files == 0:
@@ -157,7 +156,7 @@ class DeepAgentsWrapper(BaseAgent):
         environment: BaseEnvironment,
         context: AgentContext,
     ) -> None:
-        """Execute the DeepAgent on the given instruction.
+        """주어진 instruction으로 DeepAgent를 실행합니다.
 
         Args:
             instruction: The task to complete
@@ -259,7 +258,7 @@ class DeepAgentsWrapper(BaseAgent):
     def _save_trajectory(
         self, environment: BaseEnvironment, instruction: str, result: dict
     ) -> None:
-        """Save current trajectory to logs directory."""
+        """현재 trajectory를 logs 디렉토리에 저장합니다."""
         # Track token usage and cost for this run
         total_prompt_tokens = 0
         total_completion_tokens = 0
