@@ -1,4 +1,4 @@
-"""CLI를 위한 구성, 상수 밎 모델 생성."""
+"""Configuration, constants, and model creation for the CLI."""
 
 import os
 import re
@@ -56,13 +56,12 @@ DEEP_AGENTS_ASCII = f"""
 """
 
 # Interactive commands
-# Interactive commands
 COMMANDS = {
-    "clear": "화면을 지우고 대화를 재설정합니다",
-    "help": "도움말 정보를 표시합니다",
-    "tokens": "현재 세션의 토큰 사용량을 표시합니다",
-    "quit": "CLI를 종료합니다",
-    "exit": "CLI를 종료합니다",
+    "clear": "Clear screen and reset conversation",
+    "help": "Show help information",
+    "tokens": "Show token usage for current session",
+    "quit": "Exit the CLI",
+    "exit": "Exit the CLI",
 }
 
 
@@ -77,16 +76,16 @@ console = Console(highlight=False)
 
 
 def _find_project_root(start_path: Path | None = None) -> Path | None:
-    """git 디렉터리를 찾아 프로젝트 루트를 찾습니다.
+    """Find the project root by looking for .git directory.
 
-    start_path(또는 cwd)에서 디렉터리 트리를 따라 올라가며 프로젝트 루트를 나타내는
-    .git 디렉터리를 찾습니다.
+    Walks up the directory tree from start_path (or cwd) looking for a .git
+    directory, which indicates the project root.
 
     Args:
-        start_path: 검색을 시작할 디렉터리. 기본값은 현재 작업 디렉터리입니다.
+        start_path: Directory to start searching from. Defaults to current working directory.
 
     Returns:
-        찾은 경우 프로젝트 루트의 경로, 그렇지 않으면 None입니다.
+        Path to the project root if found, None otherwise.
     """
     current = Path(start_path or Path.cwd()).resolve()
 
@@ -100,29 +99,29 @@ def _find_project_root(start_path: Path | None = None) -> Path | None:
 
 
 def _find_project_agent_md(project_root: Path) -> list[Path]:
-    """프로젝트별 agent.md 파일(들)을 찾습니다.
+    """Find project-specific AGENTS.md file(s).
 
-    두 위치를 확인하고 존재하는 모든 위치를 반환합니다:
-    1. project_root/.deepagents/agent.md
-    2. project_root/agent.md
+    Checks two locations and returns ALL that exist:
+    1. project_root/.deepagents/AGENTS.md
+    2. project_root/AGENTS.md
 
-    두 파일이 모두 존재하면 둘 다 로드되어 결합됩니다.
+    Both files will be loaded and combined if both exist.
 
     Args:
-        project_root: 프로젝트 루트 디렉터리 경로.
+        project_root: Path to the project root directory.
 
     Returns:
-        프로젝트 agent.md 파일 경로 목록 (0, 1 또는 2개의 경로를 포함할 수 있음).
+        List of paths to project AGENTS.md files (may contain 0, 1, or 2 paths).
     """
     paths = []
 
-    # Check .deepagents/agent.md (preferred)
-    deepagents_md = project_root / ".deepagents" / "agent.md"
+    # Check .deepagents/AGENTS.md (preferred)
+    deepagents_md = project_root / ".deepagents" / "AGENTS.md"
     if deepagents_md.exists():
         paths.append(deepagents_md)
 
-    # Check root agent.md (fallback, but also include if both exist)
-    root_md = project_root / "agent.md"
+    # Check root AGENTS.md (fallback, but also include if both exist)
+    root_md = project_root / "AGENTS.md"
     if root_md.exists():
         paths.append(root_md)
 
@@ -131,22 +130,22 @@ def _find_project_agent_md(project_root: Path) -> list[Path]:
 
 @dataclass
 class Settings:
-    """DeepAgents-cli를 위한 전역 설정 및 환경 감지.
+    """Global settings and environment detection for deepagents-cli.
 
-    이 클래스는 시작 시 한 번 초기화되며 다음 정보에 대한 액세스를 제공합니다:
-    - 사용 가능한 모델 및 API 키
-    - 현재 프로젝트 정보
-    - 도구 가용성 (예: Tavily)
-    - 파일 시스템 경로
+    This class is initialized once at startup and provides access to:
+    - Available models and API keys
+    - Current project information
+    - Tool availability (e.g., Tavily)
+    - File system paths
 
     Attributes:
-        project_root: 현재 프로젝트 루트 디렉터리 (git 프로젝트 내인 경우)
+        project_root: Current project root directory (if in a git project)
 
-        openai_api_key: OpenAI API 키 (사용 가능한 경우)
-        anthropic_api_key: Anthropic API 키 (사용 가능한 경우)
-        tavily_api_key: Tavily API 키 (사용 가능한 경우)
-        deepagents_langchain_project: DeepAgents 에이전트 추적을 위한 LangSmith 프로젝트 이름
-        user_langchain_project: 환경의 원래 LANGSMITH_PROJECT (사용자 코드용)
+        openai_api_key: OpenAI API key if available
+        anthropic_api_key: Anthropic API key if available
+        tavily_api_key: Tavily API key if available
+        deepagents_langchain_project: LangSmith project name for deepagents agent tracing
+        user_langchain_project: Original LANGSMITH_PROJECT from environment (for user code)
     """
 
     # API keys
@@ -168,13 +167,13 @@ class Settings:
 
     @classmethod
     def from_environment(cls, *, start_path: Path | None = None) -> "Settings":
-        """현재 환경을 감지하여 설정을 생성합니다.
+        """Create settings by detecting the current environment.
 
         Args:
-            start_path: 프로젝트 감지를 시작할 디렉터리(기본값은 cwd)
+            start_path: Directory to start project detection from (defaults to cwd)
 
         Returns:
-            감지된 구성이 포함된 Settings 인스턴스
+            Settings instance with detected configuration
         """
         # Detect API keys
         openai_key = os.environ.get("OPENAI_API_KEY")
@@ -205,84 +204,84 @@ class Settings:
 
     @property
     def has_openai(self) -> bool:
-        """OpenAI API 키가 구성되어 있는지 확인합니다."""
+        """Check if OpenAI API key is configured."""
         return self.openai_api_key is not None
 
     @property
     def has_anthropic(self) -> bool:
-        """Anthropic API 키가 구성되어 있는지 확인합니다."""
+        """Check if Anthropic API key is configured."""
         return self.anthropic_api_key is not None
 
     @property
     def has_google(self) -> bool:
-        """Google API 키가 구성되어 있는지 확인합니다."""
+        """Check if Google API key is configured."""
         return self.google_api_key is not None
 
     @property
     def has_tavily(self) -> bool:
-        """Tavily API 키가 구성되어 있는지 확인합니다."""
+        """Check if Tavily API key is configured."""
         return self.tavily_api_key is not None
 
     @property
     def has_deepagents_langchain_project(self) -> bool:
-        """DeepAgents LangChain 프로젝트 이름이 구성되어 있는지 확인합니다."""
+        """Check if deepagents LangChain project name is configured."""
         return self.deepagents_langchain_project is not None
 
     @property
     def has_project(self) -> bool:
-        """현재 git 프로젝트 내에 있는지 확인합니다."""
+        """Check if currently in a git project."""
         return self.project_root is not None
 
     @property
     def user_deepagents_dir(self) -> Path:
-        """기본 사용자 수준 .deepagents 디렉터리를 가져옵니다.
+        """Get the base user-level .deepagents directory.
 
         Returns:
-            ~/.deepagents 경로
+            Path to ~/.deepagents
         """
         return Path.home() / ".deepagents"
 
     def get_user_agent_md_path(self, agent_name: str) -> Path:
-        """특정 에이전트에 대한 사용자 수준 agent.md 경로를 가져옵니다.
+        """Get user-level AGENTS.md path for a specific agent.
 
-        파일 존재 여부와 상관없이 경로를 반환합니다.
+        Returns path regardless of whether the file exists.
 
         Args:
-            agent_name: 에이전트 이름
+            agent_name: Name of the agent
 
         Returns:
-            ~/.deepagents/{agent_name}/agent.md 경로
+            Path to ~/.deepagents/{agent_name}/AGENTS.md
         """
-        return Path.home() / ".deepagents" / agent_name / "agent.md"
+        return Path.home() / ".deepagents" / agent_name / "AGENTS.md"
 
     def get_project_agent_md_path(self) -> Path | None:
-        """프로젝트 수준 agent.md 경로를 가져옵니다.
+        """Get project-level AGENTS.md path.
 
-        파일 존재 여부와 상관없이 경로를 반환합니다.
+        Returns path regardless of whether the file exists.
 
         Returns:
-            {project_root}/.deepagents/agent.md 경로, 프로젝트 내에 없는 경우 None
+            Path to {project_root}/.deepagents/AGENTS.md, or None if not in a project
         """
         if not self.project_root:
             return None
-        return self.project_root / ".deepagents" / "agent.md"
+        return self.project_root / ".deepagents" / "AGENTS.md"
 
     @staticmethod
     def _is_valid_agent_name(agent_name: str) -> bool:
-        """유효하지 않은 파일시스템 경로 및 보안 문제를 방지하기 위해 검증합니다."""
+        """Validate prevent invalid filesystem paths and security issues."""
         if not agent_name or not agent_name.strip():
             return False
         # Allow only alphanumeric, hyphens, underscores, and whitespace
         return bool(re.match(r"^[a-zA-Z0-9_\-\s]+$", agent_name))
 
     def get_agent_dir(self, agent_name: str) -> Path:
-        """전역 에이전트 디렉터리 경로를 가져옵니다.
+        """Get the global agent directory path.
 
         Args:
-            agent_name: 에이전트 이름
+            agent_name: Name of the agent
 
         Returns:
-            ~/.deepagents/{agent_name} 경로
+            Path to ~/.deepagents/{agent_name}
         """
         if not self._is_valid_agent_name(agent_name):
             msg = (
@@ -293,13 +292,13 @@ class Settings:
         return Path.home() / ".deepagents" / agent_name
 
     def ensure_agent_dir(self, agent_name: str) -> Path:
-        """전역 에이전트 디렉터리가 존재하는지 확인하고 경로를 반환합니다.
+        """Ensure the global agent directory exists and return its path.
 
         Args:
-            agent_name: 에이전트 이름
+            agent_name: Name of the agent
 
         Returns:
-            ~/.deepagents/{agent_name} 경로
+            Path to ~/.deepagents/{agent_name}
         """
         if not self._is_valid_agent_name(agent_name):
             msg = (
@@ -312,10 +311,10 @@ class Settings:
         return agent_dir
 
     def ensure_project_deepagents_dir(self) -> Path | None:
-        """프로젝트 .deepagents 디렉터리가 존재하는지 확인하고 경로를 반환합니다.
+        """Ensure the project .deepagents directory exists and return its path.
 
         Returns:
-            프로젝트 .deepagents 디렉터리 경로, 프로젝트 내에 없는 경우 None
+            Path to project .deepagents directory, or None if not in a project
         """
         if not self.project_root:
             return None
@@ -325,44 +324,44 @@ class Settings:
         return project_deepagents_dir
 
     def get_user_skills_dir(self, agent_name: str) -> Path:
-        """특정 에이전트에 대한 사용자 수준 기술(skills) 디렉터리 경로를 가져옵니다.
+        """Get user-level skills directory path for a specific agent.
 
         Args:
-            agent_name: 에이전트 이름
+            agent_name: Name of the agent
 
         Returns:
-            ~/.deepagents/{agent_name}/skills/ 경로
+            Path to ~/.deepagents/{agent_name}/skills/
         """
         return self.get_agent_dir(agent_name) / "skills"
 
     def ensure_user_skills_dir(self, agent_name: str) -> Path:
-        """사용자 수준 기술(skills) 디렉터리가 존재하는지 확인하고 경로를 반환합니다.
+        """Ensure user-level skills directory exists and return its path.
 
         Args:
-            agent_name: 에이전트 이름
+            agent_name: Name of the agent
 
         Returns:
-            ~/.deepagents/{agent_name}/skills/ 경로
+            Path to ~/.deepagents/{agent_name}/skills/
         """
         skills_dir = self.get_user_skills_dir(agent_name)
         skills_dir.mkdir(parents=True, exist_ok=True)
         return skills_dir
 
     def get_project_skills_dir(self) -> Path | None:
-        """프로젝트 수준 기술(skills) 디렉터리 경로를 가져옵니다.
+        """Get project-level skills directory path.
 
         Returns:
-            {project_root}/.deepagents/skills/ 경로, 프로젝트 내에 없는 경우 None
+            Path to {project_root}/.deepagents/skills/, or None if not in a project
         """
         if not self.project_root:
             return None
         return self.project_root / ".deepagents" / "skills"
 
     def ensure_project_skills_dir(self) -> Path | None:
-        """프로젝트 수준 기술(skills) 디렉터리가 존재하는지 확인하고 경로를 반환합니다.
+        """Ensure project-level skills directory exists and return its path.
 
         Returns:
-            {project_root}/.deepagents/skills/ 경로, 프로젝트 내에 없는 경우 None
+            Path to {project_root}/.deepagents/skills/, or None if not in a project
         """
         if not self.project_root:
             return None
@@ -376,7 +375,7 @@ settings = Settings.from_environment()
 
 
 class SessionState:
-    """변경 가능한 세션 상태를 유지합니다 (자동 승인 모드 등)."""
+    """Holds mutable session state (auto-approve mode, etc)."""
 
     def __init__(self, auto_approve: bool = False, no_splash: bool = False) -> None:
         self.auto_approve = auto_approve
@@ -386,29 +385,29 @@ class SessionState:
         self.thread_id = str(uuid.uuid4())
 
     def toggle_auto_approve(self) -> bool:
-        """자동 승인을 토글하고 새로운 상태를 반환합니다."""
+        """Toggle auto-approve and return new state."""
         self.auto_approve = not self.auto_approve
         return self.auto_approve
 
 
 def get_default_coding_instructions() -> str:
-    """기본 코딩 에이전트 지침을 가져옵니다.
+    """Get the default coding agent instructions.
 
-    이는 에이전트가 수정할 수 없는 불변의 기본 지침입니다.
-    장기 메모리(agent.md)는 미들웨어에서 별도로 처리합니다.
+    These are the immutable base instructions that cannot be modified by the agent.
+    Long-term memory (AGENTS.md) is handled separately by the middleware.
     """
     default_prompt_path = Path(__file__).parent / "default_agent_prompt.md"
     return default_prompt_path.read_text()
 
 
 def _detect_provider(model_name: str) -> str | None:
-    """모델 이름에서 공급자를 자동 감지합니다.
+    """Auto-detect provider from model name.
 
     Args:
-        model_name: 공급자를 감지할 모델 이름
+        model_name: Model name to detect provider from
 
     Returns:
-        공급자 이름(openai, anthropic, google) 또는 감지할 수 없는 경우 None
+        Provider name (openai, anthropic, google) or None if can't detect
     """
     model_lower = model_name.lower()
     if any(x in model_lower for x in ["gpt", "o1", "o3"]):
@@ -421,18 +420,18 @@ def _detect_provider(model_name: str) -> str | None:
 
 
 def create_model(model_name_override: str | None = None) -> BaseChatModel:
-    """사용 가능한 API 키를 기반으로 적절한 모델을 생성합니다.
+    """Create the appropriate model based on available API keys.
 
-    전역 설정 인스턴스를 사용하여 생성할 모델을 결정합니다.
+    Uses the global settings instance to determine which model to create.
 
     Args:
-        model_name_override: 환경 변수 대신 사용할 선택적 모델 이름
+        model_name_override: Optional model name to use instead of environment variable
 
     Returns:
-        ChatModel 인스턴스 (OpenAI, Anthropic, 또는 Google)
+        ChatModel instance (OpenAI, Anthropic, or Google)
 
     Raises:
-        API 키가 구성되지 않았거나 모델 공급자를 결정할 수 없는 경우 SystemExit
+        SystemExit if no API key is configured or model provider can't be determined
     """
     # Determine provider and model
     if model_name_override:
@@ -440,9 +439,9 @@ def create_model(model_name_override: str | None = None) -> BaseChatModel:
         provider = _detect_provider(model_name_override)
         if not provider:
             console.print(
-                f"[bold red]오류:[/bold red] 모델 이름에서 공급자를 감지할 수 없습니다: {model_name_override}"
+                f"[bold red]Error:[/bold red] Could not detect provider from model name: {model_name_override}"
             )
-            console.print("\n지원되는 모델 이름 패턴:")
+            console.print("\nSupported model name patterns:")
             console.print("  - OpenAI: gpt-*, o1-*, o3-*")
             console.print("  - Anthropic: claude-*")
             console.print("  - Google: gemini-*")
@@ -450,15 +449,19 @@ def create_model(model_name_override: str | None = None) -> BaseChatModel:
 
         # Check if API key for detected provider is available
         if provider == "openai" and not settings.has_openai:
-            console.print(f"[bold red]오류:[/bold red] 모델 '{model_name_override}'은(는) OPENAI_API_KEY가 필요합니다")
+            console.print(
+                f"[bold red]Error:[/bold red] Model '{model_name_override}' requires OPENAI_API_KEY"
+            )
             sys.exit(1)
         elif provider == "anthropic" and not settings.has_anthropic:
             console.print(
-                f"[bold red]오류:[/bold red] 모델 '{model_name_override}'은(는) ANTHROPIC_API_KEY가 필요합니다"
+                f"[bold red]Error:[/bold red] Model '{model_name_override}' requires ANTHROPIC_API_KEY"
             )
             sys.exit(1)
         elif provider == "google" and not settings.has_google:
-            console.print(f"[bold red]오류:[/bold red] 모델 '{model_name_override}'은(는) GOOGLE_API_KEY가 필요합니다")
+            console.print(
+                f"[bold red]Error:[/bold red] Model '{model_name_override}' requires GOOGLE_API_KEY"
+            )
             sys.exit(1)
 
         model_name = model_name_override
@@ -473,14 +476,14 @@ def create_model(model_name_override: str | None = None) -> BaseChatModel:
         provider = "google"
         model_name = os.environ.get("GOOGLE_MODEL", "gemini-3-pro-preview")
     else:
-        console.print("[bold red]오류:[/bold red] API 키가 구성되지 않았습니다.")
-        console.print("\n다음 환경 변수 중 하나를 설정하십시오:")
-        console.print("  - OPENAI_API_KEY     (OpenAI 모델용, 예: gpt-5-mini)")
-        console.print("  - ANTHROPIC_API_KEY  (Claude 모델용)")
-        console.print("  - GOOGLE_API_KEY     (Google Gemini 모델용)")
-        console.print("\n예시:")
+        console.print("[bold red]Error:[/bold red] No API key configured.")
+        console.print("\nPlease set one of the following environment variables:")
+        console.print("  - OPENAI_API_KEY     (for OpenAI models like gpt-5-mini)")
+        console.print("  - ANTHROPIC_API_KEY  (for Claude models)")
+        console.print("  - GOOGLE_API_KEY     (for Google Gemini models)")
+        console.print("\nExample:")
         console.print("  export OPENAI_API_KEY=your_api_key_here")
-        console.print("\n또는 .env 파일에 추가하십시오.")
+        console.print("\nOr add it to your .env file.")
         sys.exit(1)
 
     # Store model info in settings for display

@@ -68,15 +68,15 @@ class DeepAgentsWrapper(BaseAgent):
         *args,
         **kwargs,
     ) -> None:
-        """DeepAgentsWrapper를 초기화합니다.
+        """Initialize DeepAgentsWrapper.
 
         Args:
-            logs_dir: 로그를 저장할 디렉터리
-            model_name: 사용할 LLM 모델의 이름
-            temperature: 모델의 온도 설정
-            verbose: 상세 출력 활성화
-            use_cli_agent: True인 경우 deepagents-cli의 create_cli_agent를 사용(기본값).
-                          False인 경우 SDK의 create_deep_agent를 사용.
+            logs_dir: Directory for storing logs
+            model_name: Name of the LLM model to use
+            temperature: Temperature setting for the model
+            verbose: Enable verbose output
+            use_cli_agent: If True, use create_cli_agent from deepagents-cli (default).
+                          If False, use create_deep_agent from SDK.
         """
         super().__init__(logs_dir, model_name, *args, **kwargs)
 
@@ -166,7 +166,9 @@ class DeepAgentsWrapper(BaseAgent):
         """
         configuration = json.loads(environment.trial_paths.config_path.read_text())
         if not isinstance(configuration, dict):
-            raise AssertionError(f"Unexpected configuration format. Expected a dict got {type(configuration)}.")
+            raise AssertionError(
+                f"Unexpected configuration format. Expected a dict got {type(configuration)}."
+            )
 
         backend = HarborSandbox(environment)
 
@@ -192,7 +194,9 @@ class DeepAgentsWrapper(BaseAgent):
             # Get formatted system prompt with directory context
             system_prompt = await self._get_formatted_system_prompt(backend)
 
-            deep_agent = create_deep_agent(model=self._model, backend=backend, system_prompt=system_prompt)
+            deep_agent = create_deep_agent(
+                model=self._model, backend=backend, system_prompt=system_prompt
+            )
 
         # Build metadata with experiment tracking info
         metadata = {
@@ -252,7 +256,9 @@ class DeepAgentsWrapper(BaseAgent):
 
         self._save_trajectory(environment, instruction, result)
 
-    def _save_trajectory(self, environment: BaseEnvironment, instruction: str, result: dict) -> None:
+    def _save_trajectory(
+        self, environment: BaseEnvironment, instruction: str, result: dict
+    ) -> None:
         """Save current trajectory to logs directory."""
         # Track token usage and cost for this run
         total_prompt_tokens = 0
@@ -334,7 +340,9 @@ class DeepAgentsWrapper(BaseAgent):
             elif isinstance(msg, HumanMessage):
                 pass
             else:
-                raise NotImplementedError(f"Message type {type(msg)} not supported for step conversion")
+                raise NotImplementedError(
+                    f"Message type {type(msg)} not supported for step conversion"
+                )
 
         # Add any remaining pending step
         if pending_step is not None:

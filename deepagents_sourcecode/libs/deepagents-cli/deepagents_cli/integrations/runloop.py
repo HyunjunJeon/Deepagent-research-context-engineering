@@ -1,11 +1,11 @@
-"""Runloop을 위한 BackendProtocol 구현."""
+"""BackendProtocol implementation for Runloop."""
 
 try:
     import runloop_api_client
 except ImportError:
     msg = (
-        "RunloopBackend를 위해서는 runloop_api_client 패키지가 필요합니다. "
-        "`pip install runloop_api_client`로 설치하십시오."
+        "runloop_api_client package is required for RunloopBackend. "
+        "Install with `pip install runloop_api_client`."
     )
     raise ImportError(msg)
 
@@ -17,10 +17,10 @@ from runloop_api_client import Runloop
 
 
 class RunloopBackend(BaseSandbox):
-    """Runloop devbox의 파일에서 작동하는 백엔드.
+    """Backend that operates on files in a Runloop devbox.
 
-    이 구현은 Runloop API 클라이언트를 사용하여 명령을 실행하고
-    원격 devbox 환경 내에서 파일을 조작합니다.
+    This implementation uses the Runloop API client to execute commands
+    and manipulate files within a remote devbox environment.
     """
 
     def __init__(
@@ -29,22 +29,22 @@ class RunloopBackend(BaseSandbox):
         client: Runloop | None = None,
         api_key: str | None = None,
     ) -> None:
-        """Runloop 프로토콜을 초기화합니다.
+        """Initialize Runloop protocol.
 
         Args:
-            devbox_id: 작업할 Runloop devbox의 ID.
-            client: 선택적인 기존 Runloop 클라이언트 인스턴스
-            api_key: 새 클라이언트를 생성하기 위한 선택적 API 키
-                         (기본값은 RUNLOOP_API_KEY 환경 변수)
+            devbox_id: ID of the Runloop devbox to operate on.
+            client: Optional existing Runloop client instance
+            api_key: Optional API key for creating a new client
+                         (defaults to RUNLOOP_API_KEY environment variable)
         """
         if client and api_key:
-            msg = "client 또는 bearer_token 중 하나만 제공해야 하며, 둘 다 제공할 수는 없습니다."
+            msg = "Provide either client or bearer_token, not both."
             raise ValueError(msg)
 
         if client is None:
             api_key = api_key or os.environ.get("RUNLOOP_API_KEY", None)
             if api_key is None:
-                msg = "client 또는 bearer_token 중 하나는 제공되어야 합니다."
+                msg = "Either client or bearer_token must be provided."
                 raise ValueError(msg)
             client = Runloop(bearer_token=api_key)
 
@@ -54,27 +54,28 @@ class RunloopBackend(BaseSandbox):
 
     @property
     def id(self) -> str:
-        """샌드박스 백엔드의 고유 식별자."""
+        """Unique identifier for the sandbox backend."""
         return self._devbox_id
 
     def execute(
         self,
         command: str,
     ) -> ExecuteResponse:
-        """devbox에서 명령을 실행하고 ExecuteResponse를 반환합니다.
+        """Execute a command in the devbox and return ExecuteResponse.
 
         Args:
-            command: 실행할 전체 셸 명령 문자열.
+            command: Full shell command string to execute.
+            timeout: Maximum execution time in seconds (default: 30 minutes).
 
         Returns:
-            결합된 출력, 종료 코드, 선택적 시그널 및 잘림 플래그가 포함된 ExecuteResponse.
+            ExecuteResponse with combined output, exit code, optional signal, and truncation flag.
         """
         result = self._client.devboxes.execute_and_await_completion(
             devbox_id=self._devbox_id,
             command=command,
             timeout=self._timeout,
         )
-        # stdout과 stderr 결합
+        # Combine stdout and stderr
         output = result.stdout or ""
         if result.stderr:
             output += "\n" + result.stderr if output else result.stderr
@@ -82,21 +83,22 @@ class RunloopBackend(BaseSandbox):
         return ExecuteResponse(
             output=output,
             exit_code=result.exit_status,
-            truncated=False,  # Runloop는 잘림 정보를 제공하지 않음
+            truncated=False,  # Runloop doesn't provide truncation info
         )
 
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """Runloop devbox에서 여러 파일을 다운로드합니다.
+        """Download multiple files from the Runloop devbox.
 
-        Runloop API를 사용하여 파일을 개별적으로 다운로드합니다. 순서를 유지하고
-        예외를 발생시키는 대신 파일별 오류를 보고하는 FileDownloadResponse 객체 목록을 반환합니다.
+        Downloads files individually using the Runloop API. Returns a list of
+        FileDownloadResponse objects preserving order and reporting per-file
+        errors rather than raising exceptions.
 
-        TODO: 표준화된 FileOperationError 코드를 사용하여 적절한 오류 처리를 구현해야 합니다.
-        현재는 정상적인 동작(happy path)만 구현되어 있습니다.
+        TODO: Implement proper error handling with standardized FileOperationError codes.
+        Currently only implements happy path.
         """
         responses: list[FileDownloadResponse] = []
         for path in paths:
-            # devboxes.download_file은 .read()를 노출하는 BinaryAPIResponse를 반환함
+            # devboxes.download_file returns a BinaryAPIResponse which exposes .read()
             resp = self._client.devboxes.download_file(self._devbox_id, path=path)
             content = resp.read()
             responses.append(FileDownloadResponse(path=path, content=content, error=None))
@@ -104,17 +106,18 @@ class RunloopBackend(BaseSandbox):
         return responses
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """Runloop devbox에 여러 파일을 업로드합니다.
+        """Upload multiple files to the Runloop devbox.
 
-        Runloop API를 사용하여 파일을 개별적으로 업로드합니다. 순서를 유지하고
-        예외를 발생시키는 대신 파일별 오류를 보고하는 FileUploadResponse 객체 목록을 반환합니다.
+        Uploads files individually using the Runloop API. Returns a list of
+        FileUploadResponse objects preserving order and reporting per-file
+        errors rather than raising exceptions.
 
-        TODO: 표준화된 FileOperationError 코드를 사용하여 적절한 오류 처리를 구현해야 합니다.
-        현재는 정상적인 동작(happy path)만 구현되어 있습니다.
+        TODO: Implement proper error handling with standardized FileOperationError codes.
+        Currently only implements happy path.
         """
         responses: list[FileUploadResponse] = []
         for path, content in files:
-            # Runloop 클라이언트는 'file'을 바이트 또는 파일류 객체로 기대함
+            # The Runloop client expects 'file' as bytes or a file-like object
             self._client.devboxes.upload_file(self._devbox_id, path=path, file=content)
             responses.append(FileUploadResponse(path=path, error=None))
 

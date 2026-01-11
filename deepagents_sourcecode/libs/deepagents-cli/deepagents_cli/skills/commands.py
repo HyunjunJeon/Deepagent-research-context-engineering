@@ -1,6 +1,6 @@
-"""기술 관리를 위한 CLI 명령.
+"""CLI commands for skill management.
 
-이 명령들은 cli.py를 통해 CLI에 등록됩니다:
+These commands are registered with the CLI via cli.py:
 - deepagents skills list --agent <agent> [--project]
 - deepagents skills create <name>
 - deepagents skills info <name>
@@ -12,188 +12,191 @@ from pathlib import Path
 from typing import Any
 
 from deepagents_cli.config import COLORS, Settings, console
-from deepagents_cli.skills.load import MAX_SKILL_NAME_LENGTH, list_skills
+from deepagents_cli.skills.load import list_skills
+
+MAX_SKILL_NAME_LENGTH = 64
 
 
 def _validate_name(name: str) -> tuple[bool, str]:
-    """Agent Skills 사양에 따라 이름을 검증합니다.
+    """Validate name per Agent Skills spec.
 
-    요구 사항 (https://agentskills.io/specification):
-    - 최대 64자
-    - 소문자 영숫자와 하이픈만 허용 (a-z, 0-9, -)
-    - 하이픈으로 시작하거나 끝날 수 없음
-    - 연속된 하이픈 허용 안 함
-    - 경로 탐색 시퀀스 허용 안 함
+    Requirements (https://agentskills.io/specification):
+    - Max 64 characters
+    - Lowercase alphanumeric and hyphens only (a-z, 0-9, -)
+    - Cannot start or end with hyphen
+    - No consecutive hyphens
+    - No path traversal sequences
 
     Args:
-        name: 검증할 이름
+        name: The name to validate
 
     Returns:
-        (유효 여부, 오류 메시지) 튜플. 유효한 경우 오류 메시지는 비어 있습니다.
+        Tuple of (is_valid, error_message). If valid, error_message is empty.
     """
-    # 비어 있거나 공백만 있는 이름 확인
+    # Check for empty or whitespace-only names
     if not name or not name.strip():
-        return False, "비어 있을 수 없습니다"
+        return False, "cannot be empty"
 
-    # 길이 확인 (사양: 최대 64자)
+    # Check length (spec: max 64 chars)
     if len(name) > MAX_SKILL_NAME_LENGTH:
-        return False, "64자를 초과할 수 없습니다"
+        return False, "cannot exceed 64 characters"
 
-    # 경로 탐색 시퀀스 확인
+    # Check for path traversal sequences
     if ".." in name or "/" in name or "\\" in name:
-        return False, "경로 요소를 포함할 수 없습니다"
+        return False, "cannot contain path components"
 
-    # 사양: 소문자 영숫자와 하이픈만 허용
-    # 패턴 보장: 시작/종료 하이픈 없음, 연속 하이픈 없음
+    # Spec: lowercase alphanumeric and hyphens only
+    # Pattern ensures: no start/end hyphen, no consecutive hyphens
     if not re.match(r"^[a-z0-9]+(-[a-z0-9]+)*$", name):
         return (
             False,
-            "소문자, 숫자, 하이픈만 사용해야 합니다 (대문자, 밑줄 불가능, 하이픈으로 시작하거나 끝날 수 없음)",
+            "must be lowercase letters, numbers, and hyphens only "
+            "(no uppercase, no underscores, cannot start/end with hyphen)",
         )
 
     return True, ""
 
 
 def _validate_skill_path(skill_dir: Path, base_dir: Path) -> tuple[bool, str]:
-    """해결된 기술 디렉토리가 기본 디렉토리 내에 있는지 확인합니다.
+    """Validate that the resolved skill directory is within the base directory.
 
     Args:
-        skill_dir: 검증할 기술 디렉토리 경로
-        base_dir: skill_dir을 포함해야 하는 기본 기술 디렉토리
+        skill_dir: The skill directory path to validate
+        base_dir: The base skills directory that should contain skill_dir
 
     Returns:
-        (유효 여부, 오류 메시지) 튜플. 유효한 경우 오류 메시지는 비어 있습니다.
+        Tuple of (is_valid, error_message). If valid, error_message is empty.
     """
     try:
-        # 두 경로를 정식 형식으로 해결
+        # Resolve both paths to their canonical form
         resolved_skill = skill_dir.resolve()
         resolved_base = base_dir.resolve()
 
-        # skill_dir이 base_dir 내에 있는지 확인
-        # Python 3.9+인 경우 is_relative_to 사용, 그렇지 않으면 문자열 비교 사용
+        # Check if skill_dir is within base_dir
+        # Use is_relative_to if available (Python 3.9+), otherwise use string comparison
         if hasattr(resolved_skill, "is_relative_to"):
             if not resolved_skill.is_relative_to(resolved_base):
-                return False, f"기술 디렉토리는 {base_dir} 내에 있어야 합니다"
+                return False, f"Skill directory must be within {base_dir}"
         else:
-            # 이전 Python 버전을 위한 폴백
+            # Fallback for older Python versions
             try:
                 resolved_skill.relative_to(resolved_base)
             except ValueError:
-                return False, f"기술 디렉토리는 {base_dir} 내에 있어야 합니다"
+                return False, f"Skill directory must be within {base_dir}"
 
         return True, ""
     except (OSError, RuntimeError) as e:
-        return False, f"잘못된 경로: {e}"
+        return False, f"Invalid path: {e}"
 
 
 def _list(agent: str, *, project: bool = False) -> None:
-    """지정된 에이전트에 대해 사용 가능한 모든 기술을 나열합니다.
+    """List all available skills for the specified agent.
 
     Args:
-        agent: 기술을 위한 에이전트 식별자 (기본값: agent).
-        project: True인 경우 프로젝트 기술만 표시합니다.
-            False인 경우 모든 기술(사용자 + 프로젝트)을 표시합니다.
+        agent: Agent identifier for skills (default: agent).
+        project: If True, show only project skills.
+            If False, show all skills (user + project).
     """
     settings = Settings.from_environment()
     user_skills_dir = settings.get_user_skills_dir(agent)
     project_skills_dir = settings.get_project_skills_dir()
 
-    # --project 플래그가 사용된 경우 프로젝트 기술만 표시
+    # If --project flag is used, only show project skills
     if project:
         if not project_skills_dir:
-            console.print("[yellow]프로젝트 디렉토리가 아닙니다.[/yellow]")
+            console.print("[yellow]Not in a project directory.[/yellow]")
             console.print(
-                "[dim]프로젝트 기술을 사용하려면 프로젝트 루트에 .git 디렉토리가 필요합니다.[/dim]",
+                "[dim]Project skills require a .git directory in the project root.[/dim]",
                 style=COLORS["dim"],
             )
             return
 
         if not project_skills_dir.exists() or not any(project_skills_dir.iterdir()):
-            console.print("[yellow]프로젝트 기술을 찾을 수 없습니다.[/yellow]")
+            console.print("[yellow]No project skills found.[/yellow]")
             console.print(
-                f"[dim]프로젝트 기술을 추가하면 {project_skills_dir}/ 에 생성됩니다.[/dim]",
+                f"[dim]Project skills will be created in {project_skills_dir}/ when you add them.[/dim]",
                 style=COLORS["dim"],
             )
             console.print(
-                "\n[dim]프로젝트 기술 생성:\n  deepagents skills create my-skill --project[/dim]",
+                "\n[dim]Create a project skill:\n  deepagents skills create my-skill --project[/dim]",
                 style=COLORS["dim"],
             )
             return
 
         skills = list_skills(user_skills_dir=None, project_skills_dir=project_skills_dir)
-        console.print("\n[bold]프로젝트 기술:[/bold]\n", style=COLORS["primary"])
+        console.print("\n[bold]Project Skills:[/bold]\n", style=COLORS["primary"])
     else:
-        # 사용자 및 프로젝트 기술 모두 로드
+        # Load both user and project skills
         skills = list_skills(user_skills_dir=user_skills_dir, project_skills_dir=project_skills_dir)
 
         if not skills:
-            console.print("[yellow]기술을 찾을 수 없습니다.[/yellow]")
+            console.print("[yellow]No skills found.[/yellow]")
             console.print(
-                "[dim]기술을 추가하면 ~/.deepagents/agent/skills/ 에 생성됩니다.[/dim]",
+                "[dim]Skills will be created in ~/.deepagents/agent/skills/ when you add them.[/dim]",
                 style=COLORS["dim"],
             )
             console.print(
-                "\n[dim]첫 번째 기술 생성:\n  deepagents skills create my-skill[/dim]",
+                "\n[dim]Create your first skill:\n  deepagents skills create my-skill[/dim]",
                 style=COLORS["dim"],
             )
             return
 
-        console.print("\n[bold]사용 가능한 기술:[/bold]\n", style=COLORS["primary"])
+        console.print("\n[bold]Available Skills:[/bold]\n", style=COLORS["primary"])
 
-    # 출처별로 기술 그룹화
+    # Group skills by source
     user_skills = [s for s in skills if s["source"] == "user"]
     project_skills_list = [s for s in skills if s["source"] == "project"]
 
-    # 사용자 기술 표시
+    # Show user skills
     if user_skills and not project:
-        console.print("[bold cyan]사용자 기술:[/bold cyan]", style=COLORS["primary"])
+        console.print("[bold cyan]User Skills:[/bold cyan]", style=COLORS["primary"])
         for skill in user_skills:
             skill_path = Path(skill["path"])
             console.print(f"  • [bold]{skill['name']}[/bold]", style=COLORS["primary"])
             console.print(f"    {skill['description']}", style=COLORS["dim"])
-            console.print(f"    위치: {skill_path.parent}/", style=COLORS["dim"])
+            console.print(f"    Location: {skill_path.parent}/", style=COLORS["dim"])
             console.print()
 
-    # 프로젝트 기술 표시
+    # Show project skills
     if project_skills_list:
         if not project and user_skills:
             console.print()
-        console.print("[bold green]프로젝트 기술:[/bold green]", style=COLORS["primary"])
+        console.print("[bold green]Project Skills:[/bold green]", style=COLORS["primary"])
         for skill in project_skills_list:
             skill_path = Path(skill["path"])
             console.print(f"  • [bold]{skill['name']}[/bold]", style=COLORS["primary"])
             console.print(f"    {skill['description']}", style=COLORS["dim"])
-            console.print(f"    위치: {skill_path.parent}/", style=COLORS["dim"])
+            console.print(f"    Location: {skill_path.parent}/", style=COLORS["dim"])
             console.print()
 
 
 def _create(skill_name: str, agent: str, project: bool = False) -> None:
-    """템플릿 SKILL.md 파일을 사용하여 새 기술을 생성합니다.
+    """Create a new skill with a template SKILL.md file.
 
     Args:
-        skill_name: 생성할 기술의 이름.
-        agent: 기술을 위한 에이전트 식별자
-        project: True인 경우 프로젝트 기술 디렉토리에 생성합니다.
-            False인 경우 사용자 기술 디렉토리에 생성합니다.
+        skill_name: Name of the skill to create.
+        agent: Agent identifier for skills
+        project: If True, create in project skills directory.
+            If False, create in user skills directory.
     """
-    # 기술 이름 먼저 검증 (Agent Skills 사양에 따름)
+    # Validate skill name first (per Agent Skills spec)
     is_valid, error_msg = _validate_name(skill_name)
     if not is_valid:
-        console.print(f"[bold red]오류:[/bold red] 잘못된 기술 이름: {error_msg}")
+        console.print(f"[bold red]Error:[/bold red] Invalid skill name: {error_msg}")
         console.print(
-            "[dim]Agent Skills 사양에 따라: 이름은 소문자 영숫자와 하이픈만 사용해야 합니다.\n"
-            "예시: web-research, code-review, data-analysis[/dim]",
+            "[dim]Per Agent Skills spec: names must be lowercase alphanumeric with hyphens only.\n"
+            "Examples: web-research, code-review, data-analysis[/dim]",
             style=COLORS["dim"],
         )
         return
 
-    # 대상 디렉토리 결정
+    # Determine target directory
     settings = Settings.from_environment()
     if project:
         if not settings.project_root:
-            console.print("[bold red]오류:[/bold red] 프로젝트 디렉토리가 아닙니다.")
+            console.print("[bold red]Error:[/bold red] Not in a project directory.")
             console.print(
-                "[dim]프로젝트 기술을 사용하려면 프로젝트 루트에 .git 디렉토리가 필요합니다.[/dim]",
+                "[dim]Project skills require a .git directory in the project root.[/dim]",
                 style=COLORS["dim"],
             )
             return
@@ -203,24 +206,26 @@ def _create(skill_name: str, agent: str, project: bool = False) -> None:
 
     skill_dir = skills_dir / skill_name
 
-    # 해결된 경로가 skills_dir 내에 있는지 확인
+    # Validate the resolved path is within skills_dir
     is_valid_path, path_error = _validate_skill_path(skill_dir, skills_dir)
     if not is_valid_path:
-        console.print(f"[bold red]오류:[/bold red] {path_error}")
+        console.print(f"[bold red]Error:[/bold red] {path_error}")
         return
 
     if skill_dir.exists():
-        console.print(f"[bold red]오류:[/bold red] '{skill_name}' 기술이 이미 {skill_dir} 에 존재합니다")
+        console.print(
+            f"[bold red]Error:[/bold red] Skill '{skill_name}' already exists at {skill_dir}"
+        )
         return
 
-    # 기술 디렉토리 생성
+    # Create skill directory
     skill_dir.mkdir(parents=True, exist_ok=True)
 
-    # 템플릿 SKILL.md 생성 (사양: https://agentskills.io/specification)
+    # Create template SKILL.md (per Agent Skills spec: https://agentskills.io/specification)
     template = f"""---
 name: {skill_name}
-description: 이 기술이 수행하는 작업과 사용 시기에 대한 간략한 설명.
-# Agent Skills 사양에 따른 선택적 필드:
+description: Brief description of what this skill does and when to use it.
+# Optional fields per Agent Skills spec:
 # license: Apache-2.0
 # compatibility: Designed for deepagents CLI
 # metadata:
@@ -229,149 +234,149 @@ description: 이 기술이 수행하는 작업과 사용 시기에 대한 간략
 # allowed-tools: Bash(git:*) Read
 ---
 
-# {skill_name.title().replace("-", " ")} 기술
+# {skill_name.title().replace("-", " ")} Skill
 
-## 설명
+## Description
 
-[이 기술이 수행하는 작업과 사용해야 하는 시기에 대한 자세한 설명을 제공하십시오]
+[Provide a detailed explanation of what this skill does and when it should be used]
 
-## 사용 시기
+## When to Use
 
-- [시나리오 1: 사용자가 ...를 요청할 때]
-- [시나리오 2: ...가 필요할 때]
-- [시나리오 3: 태스크에 ...가 포함될 때]
+- [Scenario 1: When the user asks...]
+- [Scenario 2: When you need to...]
+- [Scenario 3: When the task involves...]
 
-## 사용 방법
+## How to Use
 
-### 1단계: [첫 번째 작업]
-[먼저 수행할 작업을 설명하십시오]
+### Step 1: [First Action]
+[Explain what to do first]
 
-### 2단계: [두 번째 작업]
-[다음에 수행할 작업을 설명하십시오]
+### Step 2: [Second Action]
+[Explain what to do next]
 
-### 3단계: [최종 작업]
-[태스크를 완료하는 방법을 설명하십시오]
+### Step 3: [Final Action]
+[Explain how to complete the task]
 
-## 권장 사항
+## Best Practices
 
-- [권장 사항 1]
-- [권장 사항 2]
-- [권장 사항 3]
+- [Best practice 1]
+- [Best practice 2]
+- [Best practice 3]
 
-## 지원 파일
+## Supporting Files
 
-이 기술 디렉토리에는 지침에서 참조하는 지원 파일이 포함될 수 있습니다:
-- `helper.py` - 자동화를 위한 Python 스크립트
-- `config.json` - 설정 파일
-- `reference.md` - 추가 참조 문서
+This skill directory can include supporting files referenced in the instructions:
+- `helper.py` - Python scripts for automation
+- `config.json` - Configuration files
+- `reference.md` - Additional reference documentation
 
-## 예시
+## Examples
 
-### 예시 1: [시나리오 이름]
+### Example 1: [Scenario Name]
 
-**사용자 요청:** "[사용자 요청 예시]"
+**User Request:** "[Example user request]"
 
-**접근 방식:**
-1. [단계별 분석]
-2. [도구 및 명령 사용]
-3. [예상 결과]
+**Approach:**
+1. [Step-by-step breakdown]
+2. [Using tools and commands]
+3. [Expected outcome]
 
-### 예시 2: [다른 시나리오]
+### Example 2: [Another Scenario]
 
-**사용자 요청:** "[다른 예시]"
+**User Request:** "[Another example]"
 
-**접근 방식:**
-1. [다른 접근 방식]
-2. [관련 명령]
-3. [예상 결과]
+**Approach:**
+1. [Different approach]
+2. [Relevant commands]
+3. [Expected result]
 
-## 참고 사항
+## Notes
 
-- [추가 팁, 경고 또는 컨텍스트]
-- [알려진 제한 사항 또는 예외 케이스]
-- [도움이 되는 외부 리소스 링크]
+- [Additional tips, warnings, or context]
+- [Known limitations or edge cases]
+- [Links to external resources if helpful]
 """
 
     skill_md = skill_dir / "SKILL.md"
     skill_md.write_text(template)
 
-    console.print(f"✓ '{skill_name}' 기술이 성공적으로 생성되었습니다!", style=COLORS["primary"])
-    console.print(f"위치: {skill_dir}\n", style=COLORS["dim"])
+    console.print(f"✓ Skill '{skill_name}' created successfully!", style=COLORS["primary"])
+    console.print(f"Location: {skill_dir}\n", style=COLORS["dim"])
     console.print(
-        "[dim]SKILL.md 파일을 편집하여 사용자 정의하십시오:\n"
-        "  1. YAML frontmatter에서 설명을 업데이트하십시오\n"
-        "  2. 지침과 예시를 채우십시오\n"
-        "  3. 지원 파일(스크립트, 설정 등)을 추가하십시오\n"
+        "[dim]Edit the SKILL.md file to customize:\n"
+        "  1. Update the description in YAML frontmatter\n"
+        "  2. Fill in the instructions and examples\n"
+        "  3. Add any supporting files (scripts, configs, etc.)\n"
         "\n"
         f"  nano {skill_md}\n"
         "\n"
-        "💡 기술 예시는 deepagents 저장소의 examples/skills/ 를 참조하십시오:\n"
-        "   - web-research: 구조화된 연구 워크플로우\n"
-        "   - langgraph-docs: LangGraph 문서 조회\n"
+        "💡 See examples/skills/ in the deepagents repo for example skills:\n"
+        "   - web-research: Structured research workflow\n"
+        "   - langgraph-docs: LangGraph documentation lookup\n"
         "\n"
-        "   예시 복사: cp -r examples/skills/web-research ~/.deepagents/agent/skills/\n",
+        "   Copy an example: cp -r examples/skills/web-research ~/.deepagents/agent/skills/\n",
         style=COLORS["dim"],
     )
 
 
 def _info(skill_name: str, *, agent: str = "agent", project: bool = False) -> None:
-    """특정 기술에 대한 자세한 정보를 표시합니다.
+    """Show detailed information about a specific skill.
 
     Args:
-        skill_name: 세부 정보를 표시할 기술의 이름.
-        agent: 기술을 위한 에이전트 식별자 (기본값: agent).
-        project: True인 경우 프로젝트 기술만 검색합니다. False인 경우 사용자 및 프로젝트 기술 모두에서 검색합니다.
+        skill_name: Name of the skill to show info for.
+        agent: Agent identifier for skills (default: agent).
+        project: If True, only search in project skills. If False, search in both user and project skills.
     """
     settings = Settings.from_environment()
     user_skills_dir = settings.get_user_skills_dir(agent)
     project_skills_dir = settings.get_project_skills_dir()
 
-    # --project 플래그에 따라 기술 로드
+    # Load skills based on --project flag
     if project:
         if not project_skills_dir:
-            console.print("[bold red]오류:[/bold red] 프로젝트 디렉토리가 아닙니다.")
+            console.print("[bold red]Error:[/bold red] Not in a project directory.")
             return
         skills = list_skills(user_skills_dir=None, project_skills_dir=project_skills_dir)
     else:
         skills = list_skills(user_skills_dir=user_skills_dir, project_skills_dir=project_skills_dir)
 
-    # 기술 찾기
+    # Find the skill
     skill = next((s for s in skills if s["name"] == skill_name), None)
 
     if not skill:
-        console.print(f"[bold red]오류:[/bold red] '{skill_name}' 기술을 찾을 수 없습니다.")
-        console.print("\n[dim]사용 가능한 기술:[/dim]", style=COLORS["dim"])
+        console.print(f"[bold red]Error:[/bold red] Skill '{skill_name}' not found.")
+        console.print("\n[dim]Available skills:[/dim]", style=COLORS["dim"])
         for s in skills:
             console.print(f"  - {s['name']}", style=COLORS["dim"])
         return
 
-    # 전체 SKILL.md 파일 읽기
+    # Read the full SKILL.md file
     skill_path = Path(skill["path"])
     skill_content = skill_path.read_text()
 
-    # 출처 레이블 결정
-    source_label = "프로젝트 기술" if skill["source"] == "project" else "사용자 기술"
+    # Determine source label
+    source_label = "Project Skill" if skill["source"] == "project" else "User Skill"
     source_color = "green" if skill["source"] == "project" else "cyan"
 
     console.print(
-        f"\n[bold]기술: {skill['name']}[/bold] [bold {source_color}]({source_label})[/bold {source_color}]\n",
+        f"\n[bold]Skill: {skill['name']}[/bold] [bold {source_color}]({source_label})[/bold {source_color}]\n",
         style=COLORS["primary"],
     )
-    console.print(f"[bold]설명:[/bold] {skill['description']}\n", style=COLORS["dim"])
-    console.print(f"[bold]위치:[/bold] {skill_path.parent}/\n", style=COLORS["dim"])
+    console.print(f"[bold]Description:[/bold] {skill['description']}\n", style=COLORS["dim"])
+    console.print(f"[bold]Location:[/bold] {skill_path.parent}/\n", style=COLORS["dim"])
 
-    # 지원 파일 나열
+    # List supporting files
     skill_dir = skill_path.parent
     supporting_files = [f for f in skill_dir.iterdir() if f.name != "SKILL.md"]
 
     if supporting_files:
-        console.print("[bold]지원 파일:[/bold]", style=COLORS["dim"])
+        console.print("[bold]Supporting Files:[/bold]", style=COLORS["dim"])
         for file in supporting_files:
             console.print(f"  - {file.name}", style=COLORS["dim"])
         console.print()
 
-    # 전체 SKILL.md 내용 표시
-    console.print("[bold]전체 SKILL.md 내용:[/bold]\n", style=COLORS["primary"])
+    # Show the full SKILL.md content
+    console.print("[bold]Full SKILL.md Content:[/bold]\n", style=COLORS["primary"])
     console.print(skill_content, style=COLORS["dim"])
     console.print()
 
@@ -379,80 +384,80 @@ def _info(skill_name: str, *, agent: str = "agent", project: bool = False) -> No
 def setup_skills_parser(
     subparsers: Any,
 ) -> argparse.ArgumentParser:
-    """모든 하위 명령과 함께 기술 하위 명령 파서를 설정합니다."""
+    """Setup the skills subcommand parser with all its subcommands."""
     skills_parser = subparsers.add_parser(
         "skills",
-        help="에이전트 기술 관리",
-        description="에이전트 기술 관리 - 기술 정보 생성, 나열 및 보기",
+        help="Manage agent skills",
+        description="Manage agent skills - create, list, and view skill information",
     )
-    skills_subparsers = skills_parser.add_subparsers(dest="skills_command", help="기술 명령")
+    skills_subparsers = skills_parser.add_subparsers(dest="skills_command", help="Skills command")
 
-    # 기술 목록
+    # Skills list
     list_parser = skills_subparsers.add_parser(
-        "list", help="사용 가능한 모든 기술 나열", description="사용 가능한 모든 기술 나열"
+        "list", help="List all available skills", description="List all available skills"
     )
     list_parser.add_argument(
         "--agent",
         default="agent",
-        help="기술을 위한 에이전트 식별자 (기본값: agent)",
+        help="Agent identifier for skills (default: agent)",
     )
     list_parser.add_argument(
         "--project",
         action="store_true",
-        help="프로젝트 수준 기술만 표시",
+        help="Show only project-level skills",
     )
 
-    # 기술 생성
+    # Skills create
     create_parser = skills_subparsers.add_parser(
         "create",
-        help="새 기술 생성",
-        description="템플릿 SKILL.md 파일을 사용하여 새 기술 생성",
+        help="Create a new skill",
+        description="Create a new skill with a template SKILL.md file",
     )
-    create_parser.add_argument("name", help="생성할 기술 이름 (예: web-research)")
+    create_parser.add_argument("name", help="Name of the skill to create (e.g., web-research)")
     create_parser.add_argument(
         "--agent",
         default="agent",
-        help="기술을 위한 에이전트 식별자 (기본값: agent)",
+        help="Agent identifier for skills (default: agent)",
     )
     create_parser.add_argument(
         "--project",
         action="store_true",
-        help="사용자 디렉토리 대신 프로젝트 디렉토리에 기술 생성",
+        help="Create skill in project directory instead of user directory",
     )
 
-    # 기술 정보
+    # Skills info
     info_parser = skills_subparsers.add_parser(
         "info",
-        help="기술에 대한 자세한 정보 표시",
-        description="특정 기술에 대한 자세한 정보 표시",
+        help="Show detailed information about a skill",
+        description="Show detailed information about a specific skill",
     )
-    info_parser.add_argument("name", help="정보를 표시할 기술 이름")
+    info_parser.add_argument("name", help="Name of the skill to show info for")
     info_parser.add_argument(
         "--agent",
         default="agent",
-        help="기술을 위한 에이전트 식별자 (기본값: agent)",
+        help="Agent identifier for skills (default: agent)",
     )
     info_parser.add_argument(
         "--project",
         action="store_true",
-        help="프로젝트 기술만 검색",
+        help="Search only in project skills",
     )
     return skills_parser
 
 
 def execute_skills_command(args: argparse.Namespace) -> None:
-    """파싱된 인수를 기반으로 기술 하위 명령을 실행합니다.
+    """Execute skills subcommands based on parsed arguments.
 
     Args:
-        args: skills_command 속성이 있는 파싱된 명령줄 인수
+        args: Parsed command line arguments with skills_command attribute
     """
-    # agent 인수 검증
+    # validate agent argument
     if args.agent:
         is_valid, error_msg = _validate_name(args.agent)
         if not is_valid:
-            console.print(f"[bold red]오류:[/bold red] 잘못된 에이전트 이름: {error_msg}")
+            console.print(f"[bold red]Error:[/bold red] Invalid agent name: {error_msg}")
             console.print(
-                "[dim]에이전트 이름은 영문자, 숫자, 하이픈 및 밑줄만 포함할 수 있습니다.[/dim]",
+                "[dim]Agent names must only contain letters, numbers, hyphens, and underscores.[/dim]",
                 style=COLORS["dim"],
             )
             return
@@ -464,19 +469,19 @@ def execute_skills_command(args: argparse.Namespace) -> None:
     elif args.skills_command == "info":
         _info(args.name, agent=args.agent, project=args.project)
     else:
-        # 하위 명령이 제공되지 않은 경우 도움말 표시
-        console.print("[yellow]기술 하위 명령을 지정하십시오: list, create, 또는 info[/yellow]")
-        console.print("\n[bold]사용법:[/bold]", style=COLORS["primary"])
+        # No subcommand provided, show help
+        console.print("[yellow]Please specify a skills subcommand: list, create, or info[/yellow]")
+        console.print("\n[bold]Usage:[/bold]", style=COLORS["primary"])
         console.print("  deepagents skills <command> [options]\n")
-        console.print("[bold]사용 가능한 명령:[/bold]", style=COLORS["primary"])
-        console.print("  list              사용 가능한 모든 기술 나열")
-        console.print("  create <name>     새 기술 생성")
-        console.print("  info <name>       기술에 대한 자세한 정보 표시")
-        console.print("\n[bold]예시:[/bold]", style=COLORS["primary"])
+        console.print("[bold]Available commands:[/bold]", style=COLORS["primary"])
+        console.print("  list              List all available skills")
+        console.print("  create <name>     Create a new skill")
+        console.print("  info <name>       Show detailed information about a skill")
+        console.print("\n[bold]Examples:[/bold]", style=COLORS["primary"])
         console.print("  deepagents skills list")
         console.print("  deepagents skills create web-research")
         console.print("  deepagents skills info web-research")
-        console.print("\n[dim]특정 명령에 대한 추가 도움말:[/dim]", style=COLORS["dim"])
+        console.print("\n[dim]For more help on a specific command:[/dim]", style=COLORS["dim"])
         console.print("  deepagents skills <command> --help", style=COLORS["dim"])
 
 

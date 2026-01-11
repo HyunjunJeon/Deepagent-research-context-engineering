@@ -1,4 +1,4 @@
-"""CLI를 위한 에이전트 관리 및 생성."""
+"""Agent management and creation for the CLI."""
 
 import os
 import shutil
@@ -8,6 +8,7 @@ from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend
 from deepagents.backends.filesystem import FilesystemBackend
 from deepagents.backends.sandbox import SandboxBackendProtocol
+from deepagents.middleware import MemoryMiddleware, SkillsMiddleware
 from langchain.agents.middleware import (
     InterruptOnConfig,
 )
@@ -15,58 +16,60 @@ from langchain.agents.middleware.types import AgentState
 from langchain.messages import ToolCall
 from langchain.tools import BaseTool
 from langchain_core.language_models import BaseChatModel
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.pregel import Pregel
 from langgraph.runtime import Runtime
 
-from deepagents_cli.agent_memory import AgentMemoryMiddleware
 from deepagents_cli.config import COLORS, config, console, get_default_coding_instructions, settings
 from deepagents_cli.integrations.sandbox_factory import get_default_working_dir
 from deepagents_cli.shell import ShellMiddleware
-from deepagents_cli.skills import SkillsMiddleware
 
 
 def list_agents() -> None:
-    """사용 가능한 모든 에이전트를 나열합니다."""
+    """List all available agents."""
     agents_dir = settings.user_deepagents_dir
 
     if not agents_dir.exists() or not any(agents_dir.iterdir()):
-        console.print("[yellow]에이전트를 찾을 수 없습니다.[/yellow]")
+        console.print("[yellow]No agents found.[/yellow]")
         console.print(
-            "[dim]처음 사용할 때 ~/.deepagents/에 에이전트가 생성됩니다.[/dim]",
+            "[dim]Agents will be created in ~/.deepagents/ when you first use them.[/dim]",
             style=COLORS["dim"],
         )
         return
 
-    console.print("\n[bold]사용 가능한 에이전트:[/bold]\n", style=COLORS["primary"])
+    console.print("\n[bold]Available Agents:[/bold]\n", style=COLORS["primary"])
 
     for agent_path in sorted(agents_dir.iterdir()):
         if agent_path.is_dir():
             agent_name = agent_path.name
-            agent_md = agent_path / "agent.md"
+            agent_md = agent_path / "AGENTS.md"
 
             if agent_md.exists():
                 console.print(f"  • [bold]{agent_name}[/bold]", style=COLORS["primary"])
                 console.print(f"    {agent_path}", style=COLORS["dim"])
             else:
-                console.print(f"  • [bold]{agent_name}[/bold] [dim](미완성)[/dim]", style=COLORS["tool"])
+                console.print(
+                    f"  • [bold]{agent_name}[/bold] [dim](incomplete)[/dim]", style=COLORS["tool"]
+                )
                 console.print(f"    {agent_path}", style=COLORS["dim"])
 
     console.print()
 
 
 def reset_agent(agent_name: str, source_agent: str | None = None) -> None:
-    """에이전트를 기본값으로 재설정하거나 다른 에이전트로부터 복사합니다."""
+    """Reset an agent to default or copy from another agent."""
     agents_dir = settings.user_deepagents_dir
     agent_dir = agents_dir / agent_name
 
     if source_agent:
         source_dir = agents_dir / source_agent
-        source_md = source_dir / "agent.md"
+        source_md = source_dir / "AGENTS.md"
 
         if not source_md.exists():
             console.print(
-                f"[bold red]오류:[/bold red] 소스 에이전트 '{source_agent}'를 찾을 수 없거나 agent.md가 없습니다"
+                f"[bold red]Error:[/bold red] Source agent '{source_agent}' not found "
+                "or has no AGENTS.md"
             )
             return
 
@@ -78,26 +81,26 @@ def reset_agent(agent_name: str, source_agent: str | None = None) -> None:
 
     if agent_dir.exists():
         shutil.rmtree(agent_dir)
-        console.print(f"기존 에이전트 디렉터리를 제거했습니다: {agent_dir}", style=COLORS["tool"])
+        console.print(f"Removed existing agent directory: {agent_dir}", style=COLORS["tool"])
 
     agent_dir.mkdir(parents=True, exist_ok=True)
-    agent_md = agent_dir / "agent.md"
+    agent_md = agent_dir / "AGENTS.md"
     agent_md.write_text(source_content)
 
-    console.print(f"✓ 에이전트 '{agent_name}'가 {action_desc}(으)로 재설정되었습니다", style=COLORS["primary"])
+    console.print(f"✓ Agent '{agent_name}' reset to {action_desc}", style=COLORS["primary"])
     console.print(f"Location: {agent_dir}\n", style=COLORS["dim"])
 
 
 def get_system_prompt(assistant_id: str, sandbox_type: str | None = None) -> str:
-    """에이전트에 대한 기본 시스템 프롬프트를 가져옵니다.
+    """Get the base system prompt for the agent.
 
     Args:
-        assistant_id: 경로 참조를 위한 에이전트 식별자
-        sandbox_type: 샌드박스 공급자 유형("modal", "runloop", "daytona").
-                     None인 경우 에이전트는 로컬 모드에서 작동합니다.
+        assistant_id: The agent identifier for path references
+        sandbox_type: Type of sandbox provider ("modal", "runloop", "daytona").
+                     If None, agent is operating in local mode.
 
     Returns:
-        시스템 프롬프트 문자열 (agent.md 내용 제외)
+        The system prompt string (without AGENTS.md content)
     """
     agent_dir_path = f"~/.deepagents/{assistant_id}"
 
@@ -108,32 +111,32 @@ def get_system_prompt(assistant_id: str, sandbox_type: str | None = None) -> str
 
         working_dir_section = f"""### Current Working Directory
 
-You are working in a **remote Linux sandbox** at `{working_dir}`.
+You are operating in a **remote Linux sandbox** at `{working_dir}`.
 
 All code execution and file operations happen in this sandbox environment.
 
-**IMPORTANT:**
-- The CLI runs locally on the user's machine, but executes code remotely.
-- Use `{working_dir}` as your working directory for all operations.
+**Important:**
+- The CLI is running locally on the user's machine, but you execute code remotely
+- Use `{working_dir}` as your working directory for all operations
 
 """
     else:
         cwd = Path.cwd()
         working_dir_section = f"""<env>
-WORKING_DIRECTORY: {cwd}
+Working directory: {cwd}
 </env>
 
 ### Current Working Directory
 
-The filesystem backend is currently operating at: `{cwd}`
+The filesystem backend is currently operating in: `{cwd}`
 
 ### File System and Paths
 
 **IMPORTANT - Path Handling:**
-- All file paths MUST be absolute (e.g. `{cwd}/file.txt`).
-- Use the WORKING_DIRECTORY from <env> to construct absolute paths.
-- Example: To create a file in the working directory, use `{cwd}/research_project/file.md`
-- Do NOT use relative paths - always construct the full absolute path.
+- All file paths must be absolute paths (e.g., `{cwd}/file.txt`)
+- Use the working directory from <env> to construct absolute paths
+- Example: To create a file in your working directory, use `{cwd}/research_project/file.md`
+- Never use relative paths - always construct full absolute paths
 
 """
 
@@ -142,92 +145,103 @@ The filesystem backend is currently operating at: `{cwd}`
         + f"""### Skills Directory
 
 Your skills are stored at: `{agent_dir_path}/skills/`
-Skills may contain scripts or support files. Use the physical filesystem path when running skill scripts with bash:
+Skills may contain scripts or supporting files. When executing skill scripts with bash, use the real filesystem path:
 Example: `bash python {agent_dir_path}/skills/web-research/script.py`
 
-### Human-in-the-Loop Tool Approvals
+### Human-in-the-Loop Tool Approval
 
-Some tool calls require user approval before execution. If a tool call is rejected by the user:
-1. Accept the decision immediately - do NOT try the same command again.
-2. Explain that you understand the user rejected the operation.
-3. Propose an alternative or ask for clarification.
-4. NEVER try to bypass a rejection by retrying the exact same command.
+Some tool calls require user approval before execution. When a tool call is rejected by the user:
+1. Accept their decision immediately - do NOT retry the same command
+2. Explain that you understand they rejected the action
+3. Suggest an alternative approach or ask for clarification
+4. Never attempt the exact same rejected command again
 
-Respect user decisions and work collaboratively.
+Respect the user's decisions and work with them collaboratively.
 
 ### Web Search Tool Usage
 
-When using the web_search tool:
-1. The tool returns search results with titles, URLs, and content snippets.
-2. You MUST read and process these results, then respond to the user naturally.
-3. Do NOT show raw JSON or tool results directly to the user.
-4. Synthesize information from multiple sources into a coherent answer.
-5. Cite sources by mentioning page titles or URLs when relevant.
-6. If you don't find what you need in the search, explain what you found and ask clarifying questions.
+When you use the web_search tool:
+1. The tool will return search results with titles, URLs, and content excerpts
+2. You MUST read and process these results, then respond naturally to the user
+3. NEVER show raw JSON or tool results directly to the user
+4. Synthesize the information from multiple sources into a coherent answer
+5. Cite your sources by mentioning page titles or URLs when relevant
+6. If the search doesn't find what you need, explain what you found and ask clarifying questions
 
-The user ONLY sees your text response, not the tool results. Always provide a complete, natural language answer after using web_search.
+The user only sees your text responses - not tool results. Always provide a complete, natural language answer after using web_search.
 
 ### Todo List Management
 
 When using the write_todos tool:
-1. Keep the todo list minimal - aim for 3-6 items max.
-2. Only create todos for complex, multi-step tasks that really need tracking.
-3. Break down tasks into clear, actionable items without being overly granular.
-4. For simple tasks (1-2 steps), just do them - don't create a todo.
-5. When first creating a todo list for a task, ALWAYS ask the user if the plan looks good before starting work.
-   - Create the todos so they render, then ask "Does this plan look good?" or similar.
-   - Wait for the user's response before marking the first todo in_progress.
-   - Adjust the plan if they want changes.
-6. Update todo status promptly as you complete each item.
+1. Keep the todo list MINIMAL - aim for 3-6 items maximum
+2. Only create todos for complex, multi-step tasks that truly need tracking
+3. Break down work into clear, actionable items without over-fragmenting
+4. For simple tasks (1-2 steps), just do them directly without creating todos
+5. When first creating a todo list for a task, ALWAYS ask the user if the plan looks good before starting work
+   - Create the todos, let them render, then ask: "Does this plan look good?" or similar
+   - Wait for the user's response before marking the first todo as in_progress
+   - If they want changes, adjust the plan accordingly
+6. Update todo status promptly as you complete each item
 
 The todo list is a planning tool - use it judiciously to avoid overwhelming the user with excessive task tracking."""
     )
 
 
-def _format_write_file_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
-    """승인 프롬프트를 위한 write_file 도구 호출 포맷."""
+def _format_write_file_description(
+    tool_call: ToolCall, _state: AgentState, _runtime: Runtime
+) -> str:
+    """Format write_file tool call for approval prompt."""
     args = tool_call["args"]
     file_path = args.get("file_path", "unknown")
     content = args.get("content", "")
 
-    action = "덮어쓰기(Overwrite)" if Path(file_path).exists() else "생성(Create)"
+    action = "Overwrite" if Path(file_path).exists() else "Create"
     line_count = len(content.splitlines())
 
-    return f"파일: {file_path}\n작업: 파일 {action}\n줄 수: {line_count}"
+    return f"File: {file_path}\nAction: {action} file\nLines: {line_count}"
 
 
-def _format_edit_file_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
-    """승인 프롬프트를 위한 edit_file 도구 호출 포맷."""
+def _format_edit_file_description(
+    tool_call: ToolCall, _state: AgentState, _runtime: Runtime
+) -> str:
+    """Format edit_file tool call for approval prompt."""
     args = tool_call["args"]
     file_path = args.get("file_path", "unknown")
     replace_all = bool(args.get("replace_all", False))
 
-    return f"파일: {file_path}\n작업: 텍스트 교체 ({'모든 항목' if replace_all else '단일 항목'})"
+    return (
+        f"File: {file_path}\n"
+        f"Action: Replace text ({'all occurrences' if replace_all else 'single occurrence'})"
+    )
 
 
-def _format_web_search_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
+def _format_web_search_description(
+    tool_call: ToolCall, _state: AgentState, _runtime: Runtime
+) -> str:
     """Format web_search tool call for approval prompt."""
     args = tool_call["args"]
     query = args.get("query", "unknown")
     max_results = args.get("max_results", 5)
 
-    return f"쿼리: {query}\n최대 결과: {max_results}\n\n⚠️  이 작업은 Tavily API 크레딧을 사용합니다"
+    return f"Query: {query}\nMax results: {max_results}\n\n⚠️  This will use Tavily API credits"
 
 
-def _format_fetch_url_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
+def _format_fetch_url_description(
+    tool_call: ToolCall, _state: AgentState, _runtime: Runtime
+) -> str:
     """Format fetch_url tool call for approval prompt."""
     args = tool_call["args"]
     url = args.get("url", "unknown")
     timeout = args.get("timeout", 30)
 
-    return f"URL: {url}\n시간 제한: {timeout}초\n\n⚠️  웹 콘텐츠를 가져와 마크다운으로 변환합니다"
+    return f"URL: {url}\nTimeout: {timeout}s\n\n⚠️  Will fetch and convert web content to markdown"
 
 
 def _format_task_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
-    """승인 프롬프트를 위한 task(서브 에이전트) 도구 호출 포맷.
+    """Format task (subagent) tool call for approval prompt.
 
-    task 도구 서명은: task(description: str, subagent_type: str)
-    description에는 서브 에이전트에게 전송될 모든 지침이 포함됩니다.
+    The task tool signature is: task(description: str, subagent_type: str)
+    The description contains all instructions that will be sent to the subagent.
     """
     args = tool_call["args"]
     description = args.get("description", "unknown")
@@ -239,31 +253,31 @@ def _format_task_description(tool_call: ToolCall, _state: AgentState, _runtime: 
         description_preview = description[:500] + "..."
 
     return (
-        f"서브 에이전트 유형: {subagent_type}\n\n"
-        f"작업 지침:\n"
+        f"Subagent Type: {subagent_type}\n\n"
+        f"Task Instructions:\n"
         f"{'─' * 40}\n"
         f"{description_preview}\n"
         f"{'─' * 40}\n\n"
-        f"⚠️  서브 에이전트는 파일 작업 및 셸 명령에 접근할 수 있습니다"
+        f"⚠️  Subagent will have access to file operations and shell commands"
     )
 
 
 def _format_shell_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
     """Format shell tool call for approval prompt."""
     args = tool_call["args"]
-    command = args.get("command", "없음")
-    return f"셸 명령: {command}\n작업 디렉터리: {Path.cwd()}"
+    command = args.get("command", "N/A")
+    return f"Shell Command: {command}\nWorking Directory: {Path.cwd()}"
 
 
 def _format_execute_description(tool_call: ToolCall, _state: AgentState, _runtime: Runtime) -> str:
     """Format execute tool call for approval prompt."""
     args = tool_call["args"]
-    command = args.get("command", "없음")
-    return f"명령 실행: {command}\n위치: 원격 샌드박스"
+    command = args.get("command", "N/A")
+    return f"Execute Command: {command}\nLocation: Remote Sandbox"
 
 
 def _add_interrupt_on() -> dict[str, InterruptOnConfig]:
-    """파괴적인 도구에 대해 히먼-인-더-루프(human-in-the-loop) interrupt_on 설정을 구성합니다."""
+    """Configure human-in-the-loop interrupt_on settings for destructive tools."""
     shell_interrupt_config: InterruptOnConfig = {
         "allowed_decisions": ["approve", "reject"],
         "description": _format_shell_description,
@@ -321,40 +335,42 @@ def create_cli_agent(
     enable_memory: bool = True,
     enable_skills: bool = True,
     enable_shell: bool = True,
+    checkpointer: BaseCheckpointSaver | None = None,
 ) -> tuple[Pregel, CompositeBackend]:
-    """유연한 옵션으로 CLI 구성 에이전트를 생성합니다.
+    """Create a CLI-configured agent with flexible options.
 
-    이것은 deepagents CLI 에이전트 생성을 위한 주요 진입점이며,
-    내부적으로 사용되거나 외부 코드(예: 벤치마킹 프레임워크, Harbor)에서 사용할 수 있습니다.
+    This is the main entry point for creating a deepagents CLI agent, usable both
+    internally and from external code (e.g., benchmarking frameworks, Harbor).
 
     Args:
-        model: 사용할 LLM 모델 (예: "anthropic:claude-sonnet-4-5-20250929")
-        assistant_id: 메모리/상태 저장을 위한 에이전트 식별자
-        tools: 에이전트에 제공할 추가 도구 (기본값: 빈 목록)
-        sandbox: 원격 실행을 위한 선택적 샌드박스 백엔드 (예: ModalBackend).
-                 None인 경우 로컬 파일시스템 + 셸을 사용합니다.
-        sandbox_type: 샌드박스 공급자 유형("modal", "runloop", "daytona").
-                     시스템 프롬프트 생성에 사용됩니다.
-        system_prompt: 기본 시스템 프롬프트를 재정의합니다. None인 경우
-                      sandbox_type 및 assistant_id를 기반으로 생성합니다.
-        auto_approve: True인 경우 사람의 확인 없이 모든 도구 호출을 자동으로 승인합니다.
-                     자동화된 워크플로에 유용합니다.
-        enable_memory: 영구 메모리를 위한 AgentMemoryMiddleware 활성화
-        enable_skills: 사용자 정의 에이전트 스킬을 위한 SkillsMiddleware 활성화
-        enable_shell: 로컬 셸 실행을 위한 ShellMiddleware 활성화 (로컬 모드에서만)
+        model: LLM model to use (e.g., "anthropic:claude-sonnet-4-5-20250929")
+        assistant_id: Agent identifier for memory/state storage
+        tools: Additional tools to provide to agent
+        sandbox: Optional sandbox backend for remote execution (e.g., ModalBackend).
+                 If None, uses local filesystem + shell.
+        sandbox_type: Type of sandbox provider ("modal", "runloop", "daytona").
+                     Used for system prompt generation.
+        system_prompt: Override the default system prompt. If None, generates one
+                      based on sandbox_type and assistant_id.
+        auto_approve: If True, automatically approves all tool calls without human
+                     confirmation. Useful for automated workflows.
+        enable_memory: Enable MemoryMiddleware for persistent memory
+        enable_skills: Enable SkillsMiddleware for custom agent skills
+        enable_shell: Enable ShellMiddleware for local shell execution (only in local mode)
+        checkpointer: Optional checkpointer for session persistence. If None, uses
+                     InMemorySaver (no persistence across CLI invocations).
 
     Returns:
-        (agent_graph, composite_backend)의 2-튜플
-        - agent_graph: 실행 준비된 구성된 LangGraph Pregel 인스턴스
-        - composite_backend: 파일 작업을 위한 CompositeBackend
+        2-tuple of (agent_graph, backend)
+        - agent_graph: Configured LangGraph Pregel instance ready for execution
+        - composite_backend: CompositeBackend for file operations
     """
-    if tools is None:
-        tools = []
+    tools = tools or []
 
     # Setup agent directory for persistent memory (if enabled)
     if enable_memory or enable_skills:
         agent_dir = settings.ensure_agent_dir(assistant_id)
-        agent_md = agent_dir / "agent.md"
+        agent_md = agent_dir / "AGENTS.md"
         if not agent_md.exists():
             source_content = get_default_coding_instructions()
             agent_md.write_text(source_content)
@@ -369,27 +385,37 @@ def create_cli_agent(
     # Build middleware stack based on enabled features
     agent_middleware = []
 
+    # Add memory middleware
+    if enable_memory:
+        memory_sources = [str(settings.get_user_agent_md_path(assistant_id))]
+        project_agent_md = settings.get_project_agent_md_path()
+        if project_agent_md:
+            memory_sources.append(str(project_agent_md))
+
+        agent_middleware.append(
+            MemoryMiddleware(
+                backend=FilesystemBackend(),
+                sources=memory_sources,
+            )
+        )
+
+    # Add skills middleware
+    if enable_skills:
+        sources = [str(skills_dir)]
+        if project_skills_dir:
+            sources.append(str(project_skills_dir))
+
+        agent_middleware.append(
+            SkillsMiddleware(
+                backend=FilesystemBackend(),
+                sources=sources,
+            )
+        )
+
     # CONDITIONAL SETUP: Local vs Remote Sandbox
     if sandbox is None:
         # ========== LOCAL MODE ==========
-        composite_backend = CompositeBackend(
-            default=FilesystemBackend(),  # Current working directory
-            routes={},  # No virtualization - use real paths
-        )
-
-        # Add memory middleware
-        if enable_memory:
-            agent_middleware.append(AgentMemoryMiddleware(settings=settings, assistant_id=assistant_id))
-
-        # Add skills middleware
-        if enable_skills:
-            agent_middleware.append(
-                SkillsMiddleware(
-                    skills_dir=skills_dir,
-                    assistant_id=assistant_id,
-                    project_skills_dir=project_skills_dir,
-                )
-            )
+        backend = FilesystemBackend()  # Current working directory
 
         # Add shell middleware (only in local mode)
         if enable_shell:
@@ -407,25 +433,7 @@ def create_cli_agent(
             )
     else:
         # ========== REMOTE SANDBOX MODE ==========
-        composite_backend = CompositeBackend(
-            default=sandbox,  # Remote sandbox (ModalBackend, etc.)
-            routes={},  # No virtualization
-        )
-
-        # Add memory middleware
-        if enable_memory:
-            agent_middleware.append(AgentMemoryMiddleware(settings=settings, assistant_id=assistant_id))
-
-        # Add skills middleware
-        if enable_skills:
-            agent_middleware.append(
-                SkillsMiddleware(
-                    skills_dir=skills_dir,
-                    assistant_id=assistant_id,
-                    project_skills_dir=project_skills_dir,
-                )
-            )
-
+        backend = sandbox  # Remote sandbox (ModalBackend, etc.)
         # Note: Shell middleware not used in sandbox mode
         # File operations and execute tool are provided by the sandbox backend
 
@@ -441,7 +449,14 @@ def create_cli_agent(
         # Full HITL for destructive operations
         interrupt_on = _add_interrupt_on()
 
+    composite_backend = CompositeBackend(
+        default=backend,
+        routes={},
+    )
+
     # Create the agent
+    # Use provided checkpointer or fallback to InMemorySaver
+    final_checkpointer = checkpointer if checkpointer is not None else InMemorySaver()
     agent = create_deep_agent(
         model=model,
         system_prompt=system_prompt,
@@ -449,6 +464,6 @@ def create_cli_agent(
         backend=composite_backend,
         middleware=agent_middleware,
         interrupt_on=interrupt_on,
-        checkpointer=InMemorySaver(),
+        checkpointer=final_checkpointer,
     ).with_config(config)
     return agent, composite_backend

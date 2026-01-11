@@ -9,10 +9,10 @@ from langgraph.types import Overwrite
 
 
 class PatchToolCallsMiddleware(AgentMiddleware):
-    """메시지 기록에서 댕글링(dangling) 도구 호출을 패치하는 미들웨어."""
+    """Middleware to patch dangling tool calls in the messages history."""
 
     def before_agent(self, state: AgentState, runtime: Runtime[Any]) -> dict[str, Any] | None:  # noqa: ARG002
-        """에이전트가 실행되기 전에 AIMessage의 댕글링 도구 호출을 처리합니다."""
+        """Before the agent runs, handle dangling tool calls from any AIMessage."""
         messages = state["messages"]
         if not messages or len(messages) == 0:
             return None
@@ -30,8 +30,8 @@ class PatchToolCallsMiddleware(AgentMiddleware):
                     if corresponding_tool_msg is None:
                         # We have a dangling tool call which needs a ToolMessage
                         tool_msg = (
-                            f"도구 호출 {tool_call['name']} (ID: {tool_call['id']})이 취소되었습니다 - "
-                            "완료되기 전에 다른 메시지가 도착했습니다."
+                            f"Tool call {tool_call['name']} with id {tool_call['id']} was "
+                            "cancelled - another message came in before it could be completed."
                         )
                         patched_messages.append(
                             ToolMessage(

@@ -1,8 +1,16 @@
-"""StateBackend: 파일을 LangGraph 에이전트 상태(임시)에 저장되도록 합니다."""
+"""StateBackend: Store files in LangGraph agent state (ephemeral)."""
 
 from typing import TYPE_CHECKING
 
-from deepagents.backends.protocol import BackendProtocol, EditResult, FileInfo, GrepMatch, WriteResult
+from deepagents.backends.protocol import (
+    BackendProtocol,
+    EditResult,
+    FileDownloadResponse,
+    FileInfo,
+    FileUploadResponse,
+    GrepMatch,
+    WriteResult,
+)
 from deepagents.backends.utils import (
     _glob_search_files,
     create_file_data,
@@ -18,28 +26,30 @@ if TYPE_CHECKING:
 
 
 class StateBackend(BackendProtocol):
-    """에이전트 상태(임시)에 파일을 저장하는 백엔드.
+    """Backend that stores files in agent state (ephemeral).
 
-    LangGraph의 상태 관리 및 체크포인팅을 사용합니다. 파일은 하나의 대화 스레드 내에서만 지속되며
-    스레드 간에는 공유되지 않습니다. 상태는 각 에이전트 단계 후에 자동으로 체크포인트됩니다.
+    Uses LangGraph's state management and checkpointing. Files persist within
+    a conversation thread but not across threads. State is automatically
+    checkpointed after each agent step.
 
-    특수 처리: LangGraph 상태는 (직접 변경이 아닌) Command 객체를 통해 업데이트되어야 하므로,
-    작업은 None 대신 Command 객체를 반환할 수 있습니다. 이는 uses_state=True 플래그로 표시됩니다.
+    Special handling: Since LangGraph state must be updated via Command objects
+    (not direct mutation), operations return Command objects instead of None.
+    This is indicated by the uses_state=True flag.
     """
 
     def __init__(self, runtime: "ToolRuntime"):
-        """런타임으로 StateBackend를 초기화합니다."""
+        """Initialize StateBackend with runtime."""
         self.runtime = runtime
 
     def ls_info(self, path: str) -> list[FileInfo]:
-        """지정된 디렉토리의 파일과 디렉토리를 나열합니다 (비재귀적).
+        """List files and directories in the specified directory (non-recursive).
 
         Args:
-            path: 디렉토리의 절대 경로.
+            path: Absolute path to directory.
 
         Returns:
-            디렉토리 바로 아래에 있는 파일 및 디렉토리에 대한 FileInfo 유사 dict 목록.
-            디렉토리는 경로 끝에 /가 붙으며 is_dir=True입니다.
+            List of FileInfo-like dicts for files and directories directly in the directory.
+            Directories have a trailing / in their path and is_dir=True.
         """
         files = self.runtime.state.get("files", {})
         infos: list[FileInfo] = []
@@ -65,21 +75,25 @@ class StateBackend(BackendProtocol):
 
             # This is a file directly in the current directory
             size = len("\n".join(fd.get("content", [])))
-            infos.append({
-                "path": k,
-                "is_dir": False,
-                "size": int(size),
-                "modified_at": fd.get("modified_at", ""),
-            })
+            infos.append(
+                {
+                    "path": k,
+                    "is_dir": False,
+                    "size": int(size),
+                    "modified_at": fd.get("modified_at", ""),
+                }
+            )
 
         # Add directories to the results
         for subdir in sorted(subdirs):
-            infos.append({
-                "path": subdir,
-                "is_dir": True,
-                "size": 0,
-                "modified_at": "",
-            })
+            infos.append(
+                {
+                    "path": subdir,
+                    "is_dir": True,
+                    "size": 0,
+                    "modified_at": "",
+                }
+            )
 
         infos.sort(key=lambda x: x.get("path", ""))
         return infos
@@ -90,15 +104,15 @@ class StateBackend(BackendProtocol):
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """파일 내용을 라인 번호와 함께 읽습니다.
+        """Read file content with line numbers.
 
         Args:
-            file_path: 파일 절대 경로.
-            offset: 읽기 시작할 라인 오프셋 (0부터 시작).
-            limit: 읽을 최대 라인 수.
+            file_path: Absolute file path.
+            offset: Line offset to start reading from (0-indexed).
+            limit: Maximum number of lines to read.
 
         Returns:
-            라인 번호가 포함된 형식화된 파일 내용, 또는 에러 메시지.
+            Formatted file content with line numbers, or error message.
         """
         files = self.runtime.state.get("files", {})
         file_data = files.get(file_path)
@@ -113,15 +127,13 @@ class StateBackend(BackendProtocol):
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """내용을 포함하는 새 파일을 생성합니다.
-        LangGraph 상태 업데이트를 위한 files_update가 포함된 WriteResult를 반환합니다.
+        """Create a new file with content.
+        Returns WriteResult with files_update to update LangGraph state.
         """
         files = self.runtime.state.get("files", {})
 
         if file_path in files:
-            return WriteResult(
-                error=f"Cannot write to {file_path} because it already exists. Read and then make an edit, or write to a new path."
-            )
+            return WriteResult(error=f"Cannot write to {file_path} because it already exists. Read and then make an edit, or write to a new path.")
 
         new_file_data = create_file_data(content)
         return WriteResult(path=file_path, files_update={file_path: new_file_data})
@@ -133,8 +145,8 @@ class StateBackend(BackendProtocol):
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """문자열 발생(occurrences)을 교체하여 파일을 편집합니다.
-        files_update와 occurrences가 포함된 EditResult를 반환합니다.
+        """Edit a file by replacing string occurrences.
+        Returns EditResult with files_update and occurrences.
         """
         files = self.runtime.state.get("files", {})
         file_data = files.get(file_path)
@@ -162,7 +174,7 @@ class StateBackend(BackendProtocol):
         return grep_matches_from_files(files, pattern, path, glob)
 
     def glob_info(self, pattern: str, path: str = "/") -> list[FileInfo]:
-        """glob 패턴과 일치하는 파일에 대한 FileInfo를 가져옵니다."""
+        """Get FileInfo for files matching glob pattern."""
         files = self.runtime.state.get("files", {})
         result = _glob_search_files(files, pattern, path)
         if result == "No files found":
@@ -172,10 +184,53 @@ class StateBackend(BackendProtocol):
         for p in paths:
             fd = files.get(p)
             size = len("\n".join(fd.get("content", []))) if fd else 0
-            infos.append({
-                "path": p,
-                "is_dir": False,
-                "size": int(size),
-                "modified_at": fd.get("modified_at", "") if fd else "",
-            })
+            infos.append(
+                {
+                    "path": p,
+                    "is_dir": False,
+                    "size": int(size),
+                    "modified_at": fd.get("modified_at", "") if fd else "",
+                }
+            )
         return infos
+
+    def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
+        """Upload multiple files to state.
+
+        Args:
+            files: List of (path, content) tuples to upload
+
+        Returns:
+            List of FileUploadResponse objects, one per input file
+        """
+        raise NotImplementedError(
+            "StateBackend does not support upload_files yet. You can upload files "
+            "directly by passing them in invoke if you're storing files in the memory."
+        )
+
+    def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
+        """Download multiple files from state.
+
+        Args:
+            paths: List of file paths to download
+
+        Returns:
+            List of FileDownloadResponse objects, one per input path
+        """
+        state_files = self.runtime.state.get("files", {})
+        responses: list[FileDownloadResponse] = []
+
+        for path in paths:
+            file_data = state_files.get(path)
+
+            if file_data is None:
+                responses.append(FileDownloadResponse(path=path, content=None, error="file_not_found"))
+                continue
+
+            # Convert file data to bytes
+            content_str = file_data_to_string(file_data)
+            content_bytes = content_str.encode("utf-8")
+
+            responses.append(FileDownloadResponse(path=path, content=content_bytes, error=None))
+
+        return responses

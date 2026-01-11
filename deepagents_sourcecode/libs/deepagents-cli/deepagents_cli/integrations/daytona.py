@@ -1,4 +1,4 @@
-"""Daytona 샌드박스 백엔드 구현."""
+"""Daytona sandbox backend implementation."""
 
 from __future__ import annotations
 
@@ -16,100 +16,102 @@ if TYPE_CHECKING:
 
 
 class DaytonaBackend(BaseSandbox):
-    """SandboxBackendProtocol을 준수하는 Daytona 백엔드 구현.
+    """Daytona backend implementation conforming to SandboxBackendProtocol.
 
-    이 구현은 BaseSandbox로부터 모든 파일 작업 메서드를 상속받으며,
-    Daytona의 API를 사용하여 execute() 메서드만 구현합니다.
+    This implementation inherits all file operation methods from BaseSandbox
+    and only implements the execute() method using Daytona's API.
     """
 
     def __init__(self, sandbox: Sandbox) -> None:
-        """Daytona 샌드박스 클라이언트로 DaytonaBackend를 초기화합니다.
+        """Initialize the DaytonaBackend with a Daytona sandbox client.
 
         Args:
-            sandbox: Daytona 샌드박스 인스턴스
+            sandbox: Daytona sandbox instance
         """
         self._sandbox = sandbox
-        self._timeout: int = 30 * 60  # 30분
+        self._timeout: int = 30 * 60  # 30 mins
 
     @property
     def id(self) -> str:
-        """샌드박스 백엔드의 고유 식별자."""
+        """Unique identifier for the sandbox backend."""
         return self._sandbox.id
 
     def execute(
         self,
         command: str,
     ) -> ExecuteResponse:
-        """샌드박스에서 명령을 실행하고 ExecuteResponse를 반환합니다.
+        """Execute a command in the sandbox and return ExecuteResponse.
 
         Args:
-            command: 실행할 전체 셸 명령 문자열.
+            command: Full shell command string to execute.
 
         Returns:
-            결합된 출력, 종료 코드, 선택적 시그널 및 잘림 플래그가 포함된 ExecuteResponse.
+            ExecuteResponse with combined output, exit code, optional signal, and truncation flag.
         """
         result = self._sandbox.process.exec(command, timeout=self._timeout)
 
         return ExecuteResponse(
-            output=result.result,  # Daytona는 stdout/stderr를 결합함
+            output=result.result,  # Daytona combines stdout/stderr
             exit_code=result.exit_code,
             truncated=False,
         )
 
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """Daytona 샌드박스에서 여러 파일을 다운로드합니다.
+        """Download multiple files from the Daytona sandbox.
 
-        효율성을 위해 Daytona의 네이티브 일괄 다운로드 API를 활용합니다.
-        부분적인 성공을 지원하므로 개별 다운로드가 다른 다운로드에 영향을 주지 않고 실패할 수 있습니다.
+        Leverages Daytona's native batch download API for efficiency.
+        Supports partial success - individual downloads may fail without
+        affecting others.
 
         Args:
-            paths: 다운로드할 파일 경로 목록.
+            paths: List of file paths to download.
 
         Returns:
-            입력 경로당 하나씩 FileDownloadResponse 객체 목록.
-            응답 순서는 입력 순서와 일치합니다.
+            List of FileDownloadResponse objects, one per input path.
+            Response order matches input order.
 
-        TODO: Daytona API 오류 문자열을 표준화된 FileOperationError 코드로 매핑해야 합니다.
-        현재는 정상적인 동작(happy path)만 구현되어 있습니다.
+        TODO: Map Daytona API error strings to standardized FileOperationError codes.
+        Currently only implements happy path.
         """
         from daytona import FileDownloadRequest
 
-        # Daytona의 네이티브 일괄 API를 사용하여 일괄 다운로드 요청 생성
+        # Create batch download request using Daytona's native batch API
         download_requests = [FileDownloadRequest(source=path) for path in paths]
         daytona_responses = self._sandbox.fs.download_files(download_requests)
 
-        # Daytona 결과를 당사의 응답 형식으로 변환
-        # TODO: 사용 가능한 경우 resp.error를 표준화된 오류 코드로 매핑
+        # Convert Daytona results to our response format
+        # TODO: Map resp.error to standardized error codes when available
         return [
             FileDownloadResponse(
                 path=resp.source,
                 content=resp.result,
-                error=None,  # TODO: resp.error를 FileOperationError로 매핑
+                error=None,  # TODO: map resp.error to FileOperationError
             )
             for resp in daytona_responses
         ]
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """Daytona 샌드박스에 여러 파일을 업로드합니다.
+        """Upload multiple files to the Daytona sandbox.
 
-        효율성을 위해 Daytona의 네이티브 일괄 업로드 API를 활용합니다.
-        부분적인 성공을 지원하므로 개별 업로드가 다른 업로드에 영향을 주지 않고 실패할 수 있습니다.
+        Leverages Daytona's native batch upload API for efficiency.
+        Supports partial success - individual uploads may fail without
+        affecting others.
 
         Args:
-            files: 업로드할 (경로, 내용) 튜플 목록.
+            files: List of (path, content) tuples to upload.
 
         Returns:
-            입력 파일당 하나씩 FileUploadResponse 객체 목록.
-            응답 순서는 입력 순서와 일치합니다.
+            List of FileUploadResponse objects, one per input file.
+            Response order matches input order.
 
-        TODO: Daytona API 오류 문자열을 표준화된 FileOperationError 코드로 매핑해야 합니다.
-        현재는 정상적인 동작(happy path)만 구현되어 있습니다.
+        TODO: Map Daytona API error strings to standardized FileOperationError codes.
+        Currently only implements happy path.
         """
         from daytona import FileUpload
 
-        # Daytona의 네이티브 일괄 API를 사용하여 일괄 업로드 요청 생성
+        # Create batch upload request using Daytona's native batch API
         upload_requests = [FileUpload(source=content, destination=path) for path, content in files]
         self._sandbox.fs.upload_files(upload_requests)
 
-        # TODO: Daytona가 오류 정보를 반환하는지 확인하고 FileOperationError 코드로 매핑
+        # TODO: Check if Daytona returns error info and map to FileOperationError codes
         return [FileUploadResponse(path=path, error=None) for path, _ in files]

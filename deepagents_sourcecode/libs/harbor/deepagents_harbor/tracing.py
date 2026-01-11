@@ -1,21 +1,21 @@
-"""Harbor DeepAgents를 위한 LangSmith 통합."""
+"""LangSmith integration for Harbor DeepAgents."""
 
 import hashlib
 import uuid
 
 
 def create_example_id_from_instruction(instruction: str, seed: int = 42) -> str:
-    """지침(instruction) 문자열에서 결정론적(deterministic) UUID를 생성합니다.
+    """Create a deterministic UUID from an instruction string.
 
-    지침을 정규화(앞뒤 공백 제거)하고 SHA-256 해시를 생성한 다음,
-    LangSmith 호환성을 위해 UUID로 변환합니다.
+    Normalizes the instruction by stripping whitespace and creating a
+    SHA-256 hash, then converting to a UUID for LangSmith compatibility.
 
     Args:
-        instruction: 해시할 작업 지침 문자열
-        seed: 기존 예제와의 충돌을 피하기 위한 정수 시드
+        instruction: The task instruction string to hash
+        seed: Integer seed to avoid collisions with existing examples
 
     Returns:
-        정규화된 지침의 해시에서 생성된 UUID 문자열
+        A UUID string generated from the hash of the normalized instruction
     """
     # Normalize the instruction: strip leading/trailing whitespace
     normalized = instruction.strip()

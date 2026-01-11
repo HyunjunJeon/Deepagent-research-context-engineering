@@ -1,4 +1,4 @@
-"""StoreBackend: LangGraph의 BaseStore(영구적, 스레드 간 공유)를 위한 어댑터."""
+"""StoreBackend: Adapter for LangGraph's BaseStore (persistent, cross-thread)."""
 
 from typing import Any
 
@@ -26,30 +26,30 @@ from deepagents.backends.utils import (
 
 
 class StoreBackend(BackendProtocol):
-    """파일을 LangGraph의 BaseStore(영구적)에 저장하는 백엔드.
+    """Backend that stores files in LangGraph's BaseStore (persistent).
 
-    LangGraph의 Store를 사용하여 영구적이고 대화 간 공유되는 저장소를 사용합니다.
-    파일은 네임스페이스를 통해 조직화되며 모든 스레드에서 지속됩니다.
+    Uses LangGraph's Store for persistent, cross-conversation storage.
+    Files are organized via namespaces and persist across all threads.
 
-    네임스페이스는 다중 에이전트 격리를 위해 선택적 assistant_id를 포함할 수 있습니다.
+    The namespace can include an optional assistant_id for multi-agent isolation.
     """
 
     def __init__(self, runtime: "ToolRuntime"):
-        """런타임으로 StoreBackend를 초기화합니다.
+        """Initialize StoreBackend with runtime.
 
         Args:
-            runtime: 저장소 접근 및 구성을 제공하는 ToolRuntime 인스턴스.
+            runtime: The ToolRuntime instance providing store access and configuration.
         """
         self.runtime = runtime
 
     def _get_store(self) -> BaseStore:
-        """저장소(store) 인스턴스를 가져옵니다.
+        """Get the store instance.
 
         Returns:
-            런타임의 BaseStore 인스턴스.
+            BaseStore instance from the runtime.
 
         Raises:
-            ValueError: 런타임에서 저장소를 사용할 수 없는 경우.
+            ValueError: If no store is available in the runtime.
         """
         store = self.runtime.store
         if store is None:
@@ -58,15 +58,15 @@ class StoreBackend(BackendProtocol):
         return store
 
     def _get_namespace(self) -> tuple[str, ...]:
-        """저장소 작업을 위한 네임스페이스를 가져옵니다.
+        """Get the namespace for store operations.
 
-        우선순위:
-        1) 존재하는 경우 `self.runtime.config` 사용 (테스트에서 명시적으로 전달).
-        2) 가능한 경우 `langgraph.config.get_config()`로 폴백(fallback).
-        3) ("filesystem",)으로 기본 설정.
+        Preference order:
+        1) Use `self.runtime.config` if present (tests pass this explicitly).
+        2) Fallback to `langgraph.config.get_config()` if available.
+        3) Default to ("filesystem",).
 
-        config 메타데이터에 assistant_id가 있는 경우,
-        에이전트별 격리를 제공하기 위해 (assistant_id, "filesystem")을 반환합니다.
+        If an assistant_id is available in the config metadata, return
+        (assistant_id, "filesystem") to provide per-assistant isolation.
         """
         namespace = "filesystem"
 
@@ -95,16 +95,16 @@ class StoreBackend(BackendProtocol):
         return (namespace,)
 
     def _convert_store_item_to_file_data(self, store_item: Item) -> dict[str, Any]:
-        """저장소 Item을 FileData 형식으로 변환합니다.
+        """Convert a store Item to FileData format.
 
         Args:
-            store_item: 파일 데이터를 포함하는 저장소 Item.
+            store_item: The store Item containing file data.
 
         Returns:
-            content, created_at, modified_at 필드를 포함하는 FileData dict.
+            FileData dict with content, created_at, and modified_at fields.
 
         Raises:
-            ValueError: 필수 필드가 누락되었거나 올바르지 않은 타입인 경우.
+            ValueError: If required fields are missing or have incorrect types.
         """
         if "content" not in store_item.value or not isinstance(store_item.value["content"], list):
             msg = f"Store item does not contain valid content field. Got: {store_item.value.keys()}"
@@ -122,13 +122,13 @@ class StoreBackend(BackendProtocol):
         }
 
     def _convert_file_data_to_store_value(self, file_data: dict[str, Any]) -> dict[str, Any]:
-        """FileData를 store.put()에 적합한 dict로 변환합니다.
+        """Convert FileData to a dict suitable for store.put().
 
         Args:
-            file_data: 변환할 FileData.
+            file_data: The FileData to convert.
 
         Returns:
-            content, created_at, modified_at 필드를 포함하는 딕셔너리.
+            Dictionary with content, created_at, and modified_at fields.
         """
         return {
             "content": file_data["content"],
@@ -145,17 +145,17 @@ class StoreBackend(BackendProtocol):
         filter: dict[str, Any] | None = None,
         page_size: int = 100,
     ) -> list[Item]:
-        """자동 페이지네이션으로 저장소를 검색하여 모든 결과를 가져옵니다.
+        """Search store with automatic pagination to retrieve all results.
 
         Args:
-            store: 검색할 저장소.
-            namespace: 검색할 계층적 경로 접두사(prefix).
-            query: 자연어 검색을 위한 선택적 쿼리.
-            filter: 결과 필터링을 위한 키-값 쌍.
-            page_size: 페이지당 가져올 아이템 수 (기본값: 100).
+            store: The store to search.
+            namespace: Hierarchical path prefix to search within.
+            query: Optional query for natural language search.
+            filter: Key-value pairs to filter results.
+            page_size: Number of items to fetch per page (default: 100).
 
         Returns:
-            검색 조건과 일치하는 모든 아이템 목록.
+            List of all items matching the search criteria.
 
         Example:
             ```python
@@ -184,14 +184,14 @@ class StoreBackend(BackendProtocol):
         return all_items
 
     def ls_info(self, path: str) -> list[FileInfo]:
-        """지정된 디렉토리의 파일과 디렉토리를 나열합니다 (비재귀적).
+        """List files and directories in the specified directory (non-recursive).
 
         Args:
-            path: 디렉토리의 절대 경로.
+            path: Absolute path to directory.
 
         Returns:
-            디렉토리 바로 아래에 있는 파일 및 디렉토리에 대한 FileInfo 유사 dict 목록.
-            디렉토리는 경로 끝에 /가 붙으며 is_dir=True입니다.
+            List of FileInfo-like dicts for files and directories directly in the directory.
+            Directories have a trailing / in their path and is_dir=True.
         """
         store = self._get_store()
         namespace = self._get_namespace()
@@ -226,21 +226,25 @@ class StoreBackend(BackendProtocol):
             except ValueError:
                 continue
             size = len("\n".join(fd.get("content", [])))
-            infos.append({
-                "path": item.key,
-                "is_dir": False,
-                "size": int(size),
-                "modified_at": fd.get("modified_at", ""),
-            })
+            infos.append(
+                {
+                    "path": item.key,
+                    "is_dir": False,
+                    "size": int(size),
+                    "modified_at": fd.get("modified_at", ""),
+                }
+            )
 
         # Add directories to the results
         for subdir in sorted(subdirs):
-            infos.append({
-                "path": subdir,
-                "is_dir": True,
-                "size": 0,
-                "modified_at": "",
-            })
+            infos.append(
+                {
+                    "path": subdir,
+                    "is_dir": True,
+                    "size": 0,
+                    "modified_at": "",
+                }
+            )
 
         infos.sort(key=lambda x: x.get("path", ""))
         return infos
@@ -251,15 +255,15 @@ class StoreBackend(BackendProtocol):
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """파일 내용을 라인 번호와 함께 읽습니다.
+        """Read file content with line numbers.
 
         Args:
-            file_path: 파일 절대 경로.
-            offset: 읽기 시작할 라인 오프셋 (0부터 시작).
-            limit: 읽을 최대 라인 수.
+            file_path: Absolute file path.
+            offset: Line offset to start reading from (0-indexed).
+            limit: Maximum number of lines to read.
 
         Returns:
-            라인 번호가 포함된 형식화된 파일 내용, 또는 에러 메시지.
+            Formatted file content with line numbers, or error message.
         """
         store = self._get_store()
         namespace = self._get_namespace()
@@ -280,8 +284,8 @@ class StoreBackend(BackendProtocol):
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """내용을 포함하는 새 파일을 생성합니다.
-        WriteResult를 반환합니다. 외부 저장소는 files_update=None을 설정합니다.
+        """Create a new file with content.
+        Returns WriteResult. External storage sets files_update=None.
         """
         store = self._get_store()
         namespace = self._get_namespace()
@@ -289,9 +293,7 @@ class StoreBackend(BackendProtocol):
         # Check if file exists
         existing = store.get(namespace, file_path)
         if existing is not None:
-            return WriteResult(
-                error=f"Cannot write to {file_path} because it already exists. Read and then make an edit, or write to a new path."
-            )
+            return WriteResult(error=f"Cannot write to {file_path} because it already exists. Read and then make an edit, or write to a new path.")
 
         # Create new file
         file_data = create_file_data(content)
@@ -306,8 +308,8 @@ class StoreBackend(BackendProtocol):
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """문자열 발생(occurrences)을 교체하여 파일을 편집합니다.
-        EditResult를 반환합니다. 외부 저장소는 files_update=None을 설정합니다.
+        """Edit a file by replacing string occurrences.
+        Returns EditResult. External storage sets files_update=None.
         """
         store = self._get_store()
         namespace = self._get_namespace()
@@ -373,23 +375,25 @@ class StoreBackend(BackendProtocol):
         for p in paths:
             fd = files.get(p)
             size = len("\n".join(fd.get("content", []))) if fd else 0
-            infos.append({
-                "path": p,
-                "is_dir": False,
-                "size": int(size),
-                "modified_at": fd.get("modified_at", "") if fd else "",
-            })
+            infos.append(
+                {
+                    "path": p,
+                    "is_dir": False,
+                    "size": int(size),
+                    "modified_at": fd.get("modified_at", "") if fd else "",
+                }
+            )
         return infos
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """저장소에 여러 파일을 업로드합니다.
+        """Upload multiple files to the store.
 
         Args:
-            files: 내용이 bytes인 (path, content) 튜플의 리스트.
+            files: List of (path, content) tuples where content is bytes.
 
         Returns:
-            FileUploadResponse 객체들의 리스트. 입력 파일마다 하나씩 반환됩니다.
-            응답 순서는 입력 순서와 일치합니다.
+            List of FileUploadResponse objects, one per input file.
+            Response order matches input order.
         """
         store = self._get_store()
         namespace = self._get_namespace()
@@ -408,14 +412,14 @@ class StoreBackend(BackendProtocol):
         return responses
 
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """저장소에서 여러 파일을 다운로드합니다.
+        """Download multiple files from the store.
 
         Args:
-            paths: 다운로드할 파일 경로의 리스트.
+            paths: List of file paths to download.
 
         Returns:
-            FileDownloadResponse 객체들의 리스트. 입력 경로마다 하나씩 반환됩니다.
-            응답 순서는 입력 순서와 일치합니다.
+            List of FileDownloadResponse objects, one per input path.
+            Response order matches input order.
         """
         store = self._get_store()
         namespace = self._get_namespace()

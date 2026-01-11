@@ -1,4 +1,4 @@
-"""CLI를 위한 입력 처리, 완성 및 프롬프트 세션."""
+"""Input handling, completers, and prompt session for the CLI."""
 
 import asyncio
 import os
@@ -30,20 +30,20 @@ EXIT_CONFIRM_WINDOW = 3.0
 
 
 class ImageTracker:
-    """현재 대화에서 붙여넣은 이미지를 추적합니다."""
+    """Track pasted images in the current conversation."""
 
     def __init__(self) -> None:
         self.images: list[ImageData] = []
         self.next_id = 1
 
     def add_image(self, image_data: ImageData) -> str:
-        """이미지를 추가하고 해당 자리 표시자 텍스트를 반환합니다.
+        """Add an image and return its placeholder text.
 
         Args:
-            image_data: 추적할 이미지 데이터
+            image_data: The image data to track
 
         Returns:
-            "[image 1]"과 같은 자리 표시자 문자열
+            Placeholder string like "[image 1]"
         """
         placeholder = f"[image {self.next_id}]"
         image_data.placeholder = placeholder
@@ -52,17 +52,17 @@ class ImageTracker:
         return placeholder
 
     def get_images(self) -> list[ImageData]:
-        """추적된 모든 이미지를 가져옵니다."""
+        """Get all tracked images."""
         return self.images.copy()
 
     def clear(self) -> None:
-        """추적된 모든 이미지를 지우고 카운터를 재설정합니다."""
+        """Clear all tracked images and reset counter."""
         self.images.clear()
         self.next_id = 1
 
 
 class FilePathCompleter(Completer):
-    """커서가 '@' 뒤에 있을 때만 파일시스템 완성을 활성화합니다."""
+    """Activate filesystem completion only when cursor is after '@'."""
 
     def __init__(self) -> None:
         self.path_completer = PathCompleter(
@@ -72,7 +72,7 @@ class FilePathCompleter(Completer):
         )
 
     def get_completions(self, document, complete_event):
-        """@가 감지되면 파일 경로 완성을 가져옵니다."""
+        """Get file path completions when @ is detected."""
         text = document.text_before_cursor
 
         # Use regex to detect @path pattern at end of line
@@ -110,10 +110,10 @@ class FilePathCompleter(Completer):
 
 
 class CommandCompleter(Completer):
-    """줄이 '/'로 시작할 때만 명령 완성을 활성화합니다."""
+    """Activate command completion only when line starts with '/'."""
 
     def get_completions(self, document, _complete_event):
-        """/가 시작 부분에 있을 때 명령 완성을 가져옵니다."""
+        """Get command completions when / is at the start."""
         text = document.text_before_cursor
 
         # Use regex to detect /command pattern at start of line
@@ -135,7 +135,7 @@ class CommandCompleter(Completer):
 
 
 def parse_file_mentions(text: str) -> tuple[str, list[Path]]:
-    """@file 멘션을 추출하고 해결된 파일 경로가 포함된 정리된 텍스트를 반환합니다."""
+    """Extract @file mentions and return cleaned text with resolved file paths."""
     pattern = r"@((?:[^\s@]|(?<=\\)\s)+)"  # Match @filename, allowing escaped spaces
     matches = re.findall(pattern, text)
 
@@ -154,21 +154,21 @@ def parse_file_mentions(text: str) -> tuple[str, list[Path]]:
             if path.exists() and path.is_file():
                 files.append(path)
             else:
-                console.print(f"[yellow]경고: 파일을 찾을 수 없습니다: {match}[/yellow]")
+                console.print(f"[yellow]Warning: File not found: {match}[/yellow]")
         except Exception as e:
-            console.print(f"[yellow]경고: 유효하지 않은 경로 {match}: {e}[/yellow]")
+            console.print(f"[yellow]Warning: Invalid path {match}: {e}[/yellow]")
 
     return text, files
 
 
 def parse_image_placeholders(text: str) -> tuple[str, int]:
-    """텍스트 내 이미지 자리 표시자 수를 셉니다.
+    """Count image placeholders in text.
 
     Args:
-        text: [image] 또는 [image N] 자리 표시자가 포함될 수 있는 입력 텍스트
+        text: Input text potentially containing [image] or [image N] placeholders
 
     Returns:
-        이미지 자리 표시자 수가 포함된 (텍스트, 개수) 튜플
+        Tuple of (text, count) where count is the number of image placeholders found
     """
     # Match [image] or [image N] patterns
     pattern = r"\[image(?:\s+\d+)?\]"
@@ -176,8 +176,10 @@ def parse_image_placeholders(text: str) -> tuple[str, int]:
     return text, len(matches)
 
 
-def get_bottom_toolbar(session_state: SessionState, session_ref: dict) -> Callable[[], list[tuple[str, str]]]:
-    """자동 승인 상태와 BASH 모드를 표시하는 툴바 함수를 반환합니다."""
+def get_bottom_toolbar(
+    session_state: SessionState, session_ref: dict
+) -> Callable[[], list[tuple[str, str]]]:
+    """Return toolbar function that shows auto-approve status and BASH MODE."""
 
     def toolbar() -> list[tuple[str, str]]:
         parts = []
@@ -196,10 +198,10 @@ def get_bottom_toolbar(session_state: SessionState, session_ref: dict) -> Callab
 
         # Base status message
         if session_state.auto_approve:
-            base_msg = "자동 승인 켜짐 (CTRL+T로 전환)"
+            base_msg = "auto-accept ON (CTRL+T to toggle)"
             base_class = "class:toolbar-green"
         else:
-            base_msg = "수동 승인 (CTRL+T로 전환)"
+            base_msg = "manual accept (CTRL+T to toggle)"
             base_class = "class:toolbar-orange"
 
         parts.append((base_class, base_msg))
@@ -210,7 +212,7 @@ def get_bottom_toolbar(session_state: SessionState, session_ref: dict) -> Callab
             now = time.monotonic()
             if now < hint_until:
                 parts.append(("", " | "))
-                parts.append(("class:toolbar-exit", " 종료하려면 Ctrl+C를 한번 더 누르세요 "))
+                parts.append(("class:toolbar-exit", " Ctrl+C again to exit "))
             else:
                 session_state.exit_hint_until = None
 
@@ -222,7 +224,7 @@ def get_bottom_toolbar(session_state: SessionState, session_ref: dict) -> Callab
 def create_prompt_session(
     _assistant_id: str, session_state: SessionState, image_tracker: ImageTracker | None = None
 ) -> PromptSession:
-    """모든 기능이 구성된 PromptSession을 생성합니다."""
+    """Create a configured PromptSession with all features."""
     # Set default editor if not already set
     if "EDITOR" not in os.environ:
         os.environ["EDITOR"] = "nano"
@@ -232,7 +234,7 @@ def create_prompt_session(
 
     @kb.add("c-c")
     def _(event) -> None:
-        """종료하려면 짧은 시간 내에 Ctrl+C를 두 번 눌러야 합니다."""
+        """Require double Ctrl+C within a short window to exit."""
         app = event.app
         now = time.monotonic()
 
@@ -256,7 +258,10 @@ def create_prompt_session(
         app_ref = app
 
         def clear_hint() -> None:
-            if session_state.exit_hint_until is not None and time.monotonic() >= session_state.exit_hint_until:
+            if (
+                session_state.exit_hint_until is not None
+                and time.monotonic() >= session_state.exit_hint_until
+            ):
                 session_state.exit_hint_until = None
                 session_state.exit_hint_handle = None
                 app_ref.invalidate()
@@ -268,7 +273,7 @@ def create_prompt_session(
     # Bind Ctrl+T to toggle auto-approve
     @kb.add("c-t")
     def _(event) -> None:
-        """자동 승인 모드를 토글합니다."""
+        """Toggle auto-approve mode."""
         session_state.toggle_auto_approve()
         # Force UI refresh to update toolbar
         event.app.invalidate()
@@ -278,7 +283,7 @@ def create_prompt_session(
         from prompt_toolkit.keys import Keys
 
         def _handle_paste_with_image_check(event, pasted_text: str = "") -> None:
-            """클립보드에서 이미지를 확인하고, 그렇지 않으면 붙여넣은 텍스트를 삽입합니다."""
+            """Check clipboard for image, otherwise insert pasted text."""
             # Try to get an image from clipboard
             clipboard_image = get_clipboard_image()
 
@@ -298,20 +303,20 @@ def create_prompt_session(
 
         @kb.add(Keys.BracketedPaste)
         def _(event) -> None:
-            """브래킷 붙여넣기(macOS의 Cmd+V)를 처리합니다 - 이미지를 먼저 확인합니다."""
+            """Handle bracketed paste (Cmd+V on macOS) - check for images first."""
             # Bracketed paste provides the pasted text in event.data
             pasted_text = event.data if hasattr(event, "data") else ""
             _handle_paste_with_image_check(event, pasted_text)
 
         @kb.add("c-v")
         def _(event) -> None:
-            """Ctrl+V 붙여넣기를 처리합니다 - 이미지를 먼저 확인합니다."""
+            """Handle Ctrl+V paste - check for images first."""
             _handle_paste_with_image_check(event)
 
     # Bind regular Enter to submit (intuitive behavior)
     @kb.add("enter")
     def _(event) -> None:
-        """완성 메뉴가 활성화되지 않은 경우 Enter는 입력을 제출합니다."""
+        """Enter submits the input, unless completion menu is active."""
         buffer = event.current_buffer
 
         # If completion menu is showing, apply the current completion
@@ -340,19 +345,19 @@ def create_prompt_session(
     # Alt+Enter for newlines (press ESC then Enter, or Option+Enter on Mac)
     @kb.add("escape", "enter")
     def _(event) -> None:
-        """Alt+Enter는 여러 줄 입력을 위해 줄바꿈을 삽입합니다."""
+        """Alt+Enter inserts a newline for multi-line input."""
         event.current_buffer.insert_text("\n")
 
     # Ctrl+E to open in external editor
     @kb.add("c-e")
     def _(event) -> None:
-        """현재 입력을 외부 편집기(기본값 nano)에서 엽니다."""
+        """Open the current input in an external editor (nano by default)."""
         event.current_buffer.open_in_editor()
 
     # Backspace handler to retrigger completions and delete image tags as units
     @kb.add("backspace")
     def _(event) -> None:
-        """백스페이스 처리: 이미지 태그를 단일 단위로 삭제하고 완성을 다시 트리거합니다."""
+        """Handle backspace: delete image tags as single unit, retrigger completion."""
         buffer = event.current_buffer
         text_before = buffer.document.text_before_cursor
 
@@ -388,12 +393,14 @@ def create_prompt_session(
     from prompt_toolkit.styles import Style
 
     # Define styles for the toolbar with full-width background colors
-    toolbar_style = Style.from_dict({
-        "bottom-toolbar": "noreverse",  # Disable default reverse video
-        "toolbar-green": "bg:#10b981 #000000",  # Green for auto-accept ON
-        "toolbar-orange": "bg:#f59e0b #000000",  # Orange for manual accept
-        "toolbar-exit": "bg:#2563eb #ffffff",  # Blue for exit hint
-    })
+    toolbar_style = Style.from_dict(
+        {
+            "bottom-toolbar": "noreverse",  # Disable default reverse video
+            "toolbar-green": "bg:#10b981 #000000",  # Green for auto-accept ON
+            "toolbar-orange": "bg:#f59e0b #000000",  # Orange for manual accept
+            "toolbar-exit": "bg:#2563eb #ffffff",  # Blue for exit hint
+        }
+    )
 
     # Create session reference dict for toolbar to access session
     session_ref = {}
@@ -409,7 +416,9 @@ def create_prompt_session(
         complete_in_thread=True,  # Async completion prevents menu freezing
         mouse_support=False,
         enable_open_in_editor=True,  # Allow Ctrl+X Ctrl+E to open external editor
-        bottom_toolbar=get_bottom_toolbar(session_state, session_ref),  # Persistent status bar at bottom
+        bottom_toolbar=get_bottom_toolbar(
+            session_state, session_ref
+        ),  # Persistent status bar at bottom
         style=toolbar_style,  # Apply toolbar styling
         reserve_space_for_menu=7,  # Reserve space for completion menu to show 5-6 results
     )

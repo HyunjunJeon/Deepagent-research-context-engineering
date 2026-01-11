@@ -15,17 +15,17 @@ from harbor.environments.base import BaseEnvironment
 
 
 class HarborSandbox(SandboxBackendProtocol):
-    """Python3가 사용 가능하다고 가정하지 않는 샌드박스 구현체입니다."""
+    """A sandbox implementation without assuming that python3 is available."""
 
     def __init__(self, environment: BaseEnvironment) -> None:
-        """제공된 환경으로 HarborSandbox를 초기화합니다."""
+        """Initialize HarborSandbox with the given environment."""
         self.environment = environment
 
     async def aexecute(
         self,
         command: str,
     ) -> ExecuteResponse:
-        """작업 환경에서 bash 명령을 실행합니다."""
+        """Execute a bash command in the task environment."""
         result = await self.environment.exec(command)
 
         # These errors appear in harbor environments when running bash commands
@@ -71,12 +71,12 @@ class HarborSandbox(SandboxBackendProtocol):
         self,
         command: str,
     ) -> ExecuteResponse:
-        """작업 환경에서 bash 명령을 실행합니다."""
-        raise NotImplementedError("이 백엔드는 비동기 실행만 지원합니다")
+        """Execute a bash command in the task environment."""
+        raise NotImplementedError("This backend only supports async execution")
 
     @property
     def id(self) -> str:
-        """샌드박스 백엔드의 고유 식별자입니다."""
+        """Unique identifier for the sandbox backend."""
         return self.environment.session_id
 
     async def aread(
@@ -85,18 +85,18 @@ class HarborSandbox(SandboxBackendProtocol):
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """셸 명령을 사용하여 줄 번호가 있는 파일 내용을 읽습니다."""
+        """Read file content with line numbers using shell commands."""
         # Escape file path for shell
         safe_path = shlex.quote(file_path)
 
         # Check if file exists and handle empty files
         cmd = f"""
 if [ ! -f {safe_path} ]; then
-    echo "오류: 파일을 찾을 수 없습니다"
+    echo "Error: File not found"
     exit 1
 fi
 if [ ! -s {safe_path} ]; then
-    echo "시스템 알림: 파일이 존재하지만 내용이 비어 있습니다"
+    echo "System reminder: File exists but has empty contents"
     exit 0
 fi
 # Use awk to add line numbers and handle offset/limit
@@ -109,8 +109,8 @@ awk -v offset={offset} -v limit={limit} '
 """
         result = await self.aexecute(cmd)
 
-        if result.exit_code != 0 or "오류: 파일을 찾을 수 없습니다" in result.output:
-            return f"오류: 파일 '{file_path}'을(를) 찾을 수 없습니다"
+        if result.exit_code != 0 or "Error: File not found" in result.output:
+            return f"Error: File '{file_path}' not found"
 
         return result.output.rstrip()
 
@@ -120,22 +120,22 @@ awk -v offset={offset} -v limit={limit} '
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """셸 명령을 사용하여 줄 번호가 있는 파일 내용을 읽습니다."""
-        raise NotImplementedError("aread를 사용하십시오")
+        """Read file content with line numbers using shell commands."""
+        raise NotImplementedError("Use aread instead")
 
     async def awrite(
         self,
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """셸 명령을 사용하여 새 파일을 생성합니다."""
+        """Create a new file using shell commands."""
         # Encode content as base64 to avoid escaping issues
         content_b64 = base64.b64encode(content.encode("utf-8")).decode("ascii")
         safe_path = shlex.quote(file_path)
 
         cmd = f"""
 if [ -e {safe_path} ]; then
-    echo "오류: 파일 '{file_path}'이(가) 이미 존재합니다" >&2
+    echo "Error: File '{file_path}' already exists" >&2
     exit 1
 fi
 parent_dir=$(dirname {safe_path})
@@ -145,7 +145,7 @@ echo '{content_b64}' | base64 -d > {safe_path}
         result = await self.aexecute(cmd)
 
         if result.exit_code != 0 or "Error:" in result.output:
-            error_msg = result.output.strip() or f"파일 '{file_path}' 쓰기 실패"
+            error_msg = result.output.strip() or f"Failed to write file '{file_path}'"
             return WriteResult(error=error_msg)
 
         return WriteResult(path=file_path, files_update=None)
@@ -155,8 +155,8 @@ echo '{content_b64}' | base64 -d > {safe_path}
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """셸 명령을 사용하여 새 파일을 생성합니다."""
-        raise NotImplementedError("awrite를 사용하십시오")
+        """Create a new file using shell commands."""
+        raise NotImplementedError("Use awrite instead")
 
     async def aedit(
         self,
@@ -165,7 +165,7 @@ echo '{content_b64}' | base64 -d > {safe_path}
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """셸 명령을 사용하여 문자열 조회를 대체하여 파일을 편집합니다."""
+        """Edit a file by replacing string occurrences using shell commands."""
         # Encode strings as base64 to avoid escaping issues
         old_b64 = base64.b64encode(old_string.encode("utf-8")).decode("ascii")
         new_b64 = base64.b64encode(new_string.encode("utf-8")).decode("ascii")
@@ -205,15 +205,15 @@ echo "$count"
         output = result.output.strip()
 
         if exit_code == 1:
-            return EditResult(error=f"오류: 파일에서 문자열을 찾을 수 없습니다: '{old_string}'")
+            return EditResult(error=f"Error: String not found in file: '{old_string}'")
         if exit_code == 2:
             return EditResult(
-                error=f"오류: 문자열 '{old_string}'이(가) 여러 번 나옵니다. 모든 항목을 바꾸려면 replace_all=True를 사용하십시오."
+                error=f"Error: String '{old_string}' appears multiple times. Use replace_all=True to replace all occurrences."
             )
         if exit_code == 3:
-            return EditResult(error=f"오류: 파일 '{file_path}'을(를) 찾을 수 없습니다")
+            return EditResult(error=f"Error: File '{file_path}' not found")
         if exit_code != 0:
-            return EditResult(error=f"파일 편집 오류: {output}")
+            return EditResult(error=f"Error editing file: {output}")
 
         try:
             count = int(output.split("\n")[0])
@@ -229,11 +229,11 @@ echo "$count"
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """셸 명령을 사용하여 문자열 조회를 대체하여 파일을 편집합니다."""
-        raise NotImplementedError("aedit를 사용하십시오")
+        """Edit a file by replacing string occurrences using shell commands."""
+        raise NotImplementedError("Use aedit instead")
 
     async def als_info(self, path: str) -> list[FileInfo]:
-        """셸 명령을 사용하여 디렉터리 내용과 메타데이터를 나열합니다."""
+        """List directory contents with metadata using shell commands."""
         safe_path = shlex.quote(path)
 
         cmd = f"""
@@ -267,8 +267,8 @@ done
         return file_infos
 
     def ls_info(self, path: str) -> list[FileInfo]:
-        """셸 명령을 사용하여 디렉터리 내용과 메타데이터를 나열합니다."""
-        raise NotImplementedError("als_info를 사용하십시오")
+        """List directory contents with metadata using shell commands."""
+        raise NotImplementedError("Use als_info instead")
 
     async def agrep_raw(
         self,
@@ -276,7 +276,7 @@ done
         path: str | None = None,
         glob: str | None = None,
     ) -> list[GrepMatch] | str:
-        """grep을 사용하여 파일에서 패턴을 검색합니다."""
+        """Search for pattern in files using grep."""
         search_path = shlex.quote(path or ".")
 
         # Build grep command
@@ -304,11 +304,13 @@ done
             parts = line.split(":", 2)
             if len(parts) >= 3:
                 try:
-                    matches.append({
-                        "path": parts[0],
-                        "line": int(parts[1]),
-                        "text": parts[2],
-                    })
+                    matches.append(
+                        {
+                            "path": parts[0],
+                            "line": int(parts[1]),
+                            "text": parts[2],
+                        }
+                    )
                 except ValueError:
                     continue
 
@@ -320,13 +322,14 @@ done
         path: str | None = None,
         glob: str | None = None,
     ) -> list[GrepMatch] | str:
-        """grep을 사용하여 파일에서 패턴을 검색합니다."""
-        raise NotImplementedError("agrep_raw를 사용하십시오")
+        """Search for pattern in files using grep."""
+        raise NotImplementedError("Use agrep_raw instead")
 
     async def aglob_info(self, pattern: str, path: str = "/") -> list[FileInfo]:
-        """셸 명령을 사용하여 glob 패턴과 일치하는 파일을 찾습니다.
+        """Find files matching glob pattern using shell commands.
 
-        이 구현은 현재 모든 glob 패턴을 지원하지는 않습니다.
+        Please note that this implementation does not currently support all glob
+        patterns.
         """
         safe_path = shlex.quote(path)
         safe_pattern = shlex.quote(pattern)
@@ -360,13 +363,15 @@ done
                 continue
             parts = line.split("|")
             if len(parts) == 2:
-                file_infos.append({
-                    "path": parts[0],
-                    "is_dir": parts[1] == "true",
-                })
+                file_infos.append(
+                    {
+                        "path": parts[0],
+                        "is_dir": parts[1] == "true",
+                    }
+                )
 
         return file_infos
 
     def glob_info(self, pattern: str, path: str = "/") -> list[FileInfo]:
-        """셸 명령을 사용하여 glob 패턴과 일치하는 파일을 찾습니다."""
-        raise NotImplementedError("aglob_info를 사용하십시오")
+        """Find files matching glob pattern using shell commands."""
+        raise NotImplementedError("Use aglob_info instead")

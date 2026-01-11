@@ -1,4 +1,4 @@
-"""CLI 표시를 위한 파일 작업 추적 및 diff 계산 도움말."""
+"""Helpers for tracking file operations and computing diffs for CLI display."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ FileOpStatus = Literal["pending", "success", "error"]
 
 @dataclass
 class ApprovalPreview:
-    """HITL 미리보기를 렌더링하는 데 사용되는 데이터."""
+    """Data used to render HITL previews."""
 
     title: str
     details: list[str]
@@ -29,7 +29,7 @@ class ApprovalPreview:
 
 
 def _safe_read(path: Path) -> str | None:
-    """파일 내용을 읽고, 실패 시 None을 반환합니다."""
+    """Read file content, returning None on failure."""
     try:
         return path.read_text()
     except (OSError, UnicodeDecodeError):
@@ -37,7 +37,7 @@ def _safe_read(path: Path) -> str | None:
 
 
 def _count_lines(text: str) -> int:
-    """빈 문자열을 0줄로 취급하여 텍스트의 줄 수를 셉니다."""
+    """Count lines in text, treating empty strings as zero lines."""
     if not text:
         return 0
     return len(text.splitlines())
@@ -51,17 +51,17 @@ def compute_unified_diff(
     max_lines: int | None = 800,
     context_lines: int = 3,
 ) -> str | None:
-    """이전 내용과 이후 내용 간의 통합 diff를 계산합니다.
+    """Compute a unified diff between before and after content.
 
     Args:
-        before: 원본 내용
-        after: 새로운 내용
-        display_path: diff 헤더에 표시할 경로
-        max_lines: 최대 diff 줄 수 (제한 없으면 None)
-        context_lines: 변경 사항 주변의 컨텍스트 줄 수 (기본값 3)
+        before: Original content
+        after: New content
+        display_path: Path for display in diff headers
+        max_lines: Maximum number of diff lines (None for unlimited)
+        context_lines: Number of context lines around changes (default 3)
 
     Returns:
-        통합 diff 문자열 또는 변경 사항이 없는 경우 None
+        Unified diff string or None if no changes
     """
     before_lines = before.splitlines()
     after_lines = after.splitlines()
@@ -86,7 +86,7 @@ def compute_unified_diff(
 
 @dataclass
 class FileOpMetrics:
-    """파일 작업에 대한 줄 및 바이트 수준 메트릭."""
+    """Line and byte level metrics for a file operation."""
 
     lines_read: int = 0
     start_line: int | None = None
@@ -99,7 +99,7 @@ class FileOpMetrics:
 
 @dataclass
 class FileOperationRecord:
-    """단일 파일시스템 도구 호출을 추적합니다."""
+    """Track a single filesystem tool call."""
 
     tool_name: str
     display_path: str
@@ -117,7 +117,7 @@ class FileOperationRecord:
 
 
 def resolve_physical_path(path_str: str | None, assistant_id: str | None) -> Path | None:
-    """가상/상대 경로를 실제 파일시스템 경로로 변환합니다."""
+    """Convert a virtual/relative path to a physical filesystem path."""
     if not path_str:
         return None
     try:
@@ -134,9 +134,9 @@ def resolve_physical_path(path_str: str | None, assistant_id: str | None) -> Pat
 
 
 def format_display_path(path_str: str | None) -> str:
-    """표시용으로 경로를 포맷합니다."""
+    """Format a path for display."""
     if not path_str:
-        return "(알 수 없음)"
+        return "(unknown)"
     try:
         path = Path(path_str)
         if path.is_absolute():
@@ -151,7 +151,7 @@ def build_approval_preview(
     args: dict[str, Any],
     assistant_id: str | None,
 ) -> ApprovalPreview | None:
-    """HITL 승인을 위한 요약 정보 및 diff를 수집합니다."""
+    """Collect summary info and diff for HITL approvals."""
     path_str = str(args.get("file_path") or args.get("path") or "")
     display_path = format_display_path(path_str)
     physical_path = resolve_physical_path(path_str, assistant_id)
@@ -163,33 +163,37 @@ def build_approval_preview(
         diff = compute_unified_diff(before or "", after, display_path, max_lines=100)
         additions = 0
         if diff:
-            additions = sum(1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
+            additions = sum(
+                1
+                for line in diff.splitlines()
+                if line.startswith("+") and not line.startswith("+++")
+            )
         total_lines = _count_lines(after)
         details = [
-            f"파일: {path_str}",
-            "작업: 새 파일 생성" + (" (기존 내용 덮어씀)" if before else ""),
-            f"작성할 줄 수: {additions or total_lines}",
+            f"File: {path_str}",
+            "Action: Create new file" + (" (overwrites existing content)" if before else ""),
+            f"Lines to write: {additions or total_lines}",
         ]
         return ApprovalPreview(
-            title=f"{display_path} 쓰기",
+            title=f"Write {display_path}",
             details=details,
             diff=diff,
-            diff_title=f"{display_path} 차이(Diff)",
+            diff_title=f"Diff {display_path}",
         )
 
     if tool_name == "edit_file":
         if physical_path is None:
             return ApprovalPreview(
-                title=f"{display_path} 업데이트",
-                details=[f"파일: {path_str}", "작업: 텍스트 교체"],
-                error="파일 경로를 확인할 수 없습니다.",
+                title=f"Update {display_path}",
+                details=[f"File: {path_str}", "Action: Replace text"],
+                error="Unable to resolve file path.",
             )
         before = _safe_read(physical_path)
         if before is None:
             return ApprovalPreview(
-                title=f"{display_path} 업데이트",
-                details=[f"파일: {path_str}", "작업: 텍스트 교체"],
-                error="현재 파일 내용을 읽을 수 없습니다.",
+                title=f"Update {display_path}",
+                details=[f"File: {path_str}", "Action: Replace text"],
+                error="Unable to read current file contents.",
             )
         old_string = str(args.get("old_string", ""))
         new_string = str(args.get("new_string", ""))
@@ -197,8 +201,8 @@ def build_approval_preview(
         replacement = perform_string_replacement(before, old_string, new_string, replace_all)
         if isinstance(replacement, str):
             return ApprovalPreview(
-                title=f"{display_path} 업데이트",
-                details=[f"파일: {path_str}", "작업: 텍스트 교체"],
+                title=f"Update {display_path}",
+                details=[f"File: {path_str}", "Action: Replace text"],
                 error=replacement,
             )
         after, occurrences = replacement
@@ -206,35 +210,45 @@ def build_approval_preview(
         additions = 0
         deletions = 0
         if diff:
-            additions = sum(1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
-            deletions = sum(1 for line in diff.splitlines() if line.startswith("-") and not line.startswith("---"))
+            additions = sum(
+                1
+                for line in diff.splitlines()
+                if line.startswith("+") and not line.startswith("+++")
+            )
+            deletions = sum(
+                1
+                for line in diff.splitlines()
+                if line.startswith("-") and not line.startswith("---")
+            )
         details = [
-            f"파일: {path_str}",
-            f"작업: 텍스트 교체 ({'모든 발생' if replace_all else '단일 발생'})",
-            f"일치하는 발생: {occurrences}",
-            f"변경된 줄: +{additions} / -{deletions}",
+            f"File: {path_str}",
+            f"Action: Replace text ({'all occurrences' if replace_all else 'single occurrence'})",
+            f"Occurrences matched: {occurrences}",
+            f"Lines changed: +{additions} / -{deletions}",
         ]
         return ApprovalPreview(
-            title=f"{display_path} 업데이트",
+            title=f"Update {display_path}",
             details=details,
             diff=diff,
-            diff_title=f"{display_path} 차이(Diff)",
+            diff_title=f"Diff {display_path}",
         )
 
     return None
 
 
 class FileOpTracker:
-    """CLI 상호작용 중 파일 작업 메트릭을 수집합니다."""
+    """Collect file operation metrics during a CLI interaction."""
 
     def __init__(self, *, assistant_id: str | None, backend: BACKEND_TYPES | None = None) -> None:
-        """추적기를 초기화합니다."""
+        """Initialize the tracker."""
         self.assistant_id = assistant_id
         self.backend = backend
         self.active: dict[str | None, FileOperationRecord] = {}
         self.completed: list[FileOperationRecord] = []
 
-    def start_operation(self, tool_name: str, args: dict[str, Any], tool_call_id: str | None) -> None:
+    def start_operation(
+        self, tool_name: str, args: dict[str, Any], tool_call_id: str | None
+    ) -> None:
         if tool_name not in {"read_file", "write_file", "edit_file"}:
             return
         path_str = str(args.get("file_path") or args.get("path") or "")
@@ -250,7 +264,11 @@ class FileOpTracker:
             if self.backend and path_str:
                 try:
                     responses = self.backend.download_files([path_str])
-                    if responses and responses[0].content is not None and responses[0].error is None:
+                    if (
+                        responses
+                        and responses[0].content is not None
+                        and responses[0].error is None
+                    ):
                         record.before_content = responses[0].content.decode("utf-8")
                     else:
                         record.before_content = ""
@@ -261,7 +279,7 @@ class FileOpTracker:
         self.active[tool_call_id] = record
 
     def update_args(self, tool_call_id: str, args: dict[str, Any]) -> None:
-        """활성 작업의 인수를 업데이트하고 before_content 캡처를 다시 시도합니다."""
+        """Update arguments for an active operation and retry capturing before_content."""
         record = self.active.get(tool_call_id)
         if not record:
             return
@@ -277,7 +295,11 @@ class FileOpTracker:
                 if self.backend:
                     try:
                         responses = self.backend.download_files([path_str])
-                        if responses and responses[0].content is not None and responses[0].error is None:
+                        if (
+                            responses
+                            and responses[0].content is not None
+                            and responses[0].error is None
+                        ):
                             record.before_content = responses[0].content.decode("utf-8")
                         else:
                             record.before_content = ""
@@ -305,7 +327,9 @@ class FileOpTracker:
         else:
             content_text = str(content) if content is not None else ""
 
-        if getattr(tool_message, "status", "success") != "success" or content_text.lower().startswith("error"):
+        if getattr(
+            tool_message, "status", "success"
+        ) != "success" or content_text.lower().startswith("error"):
             record.status = "error"
             record.error = content_text
             self._finalize(record)
@@ -335,7 +359,7 @@ class FileOpTracker:
             self._populate_after_content(record)
             if record.after_content is None:
                 record.status = "error"
-                record.error = "업데이트된 파일 내용을 읽을 수 없습니다."
+                record.error = "Could not read updated file content."
                 self._finalize(record)
                 return record
             record.metrics.lines_written = _count_lines(record.after_content)
@@ -348,8 +372,16 @@ class FileOpTracker:
             )
             record.diff = diff
             if diff:
-                additions = sum(1 for line in diff.splitlines() if line.startswith("+") and not line.startswith("+++"))
-                deletions = sum(1 for line in diff.splitlines() if line.startswith("-") and not line.startswith("---"))
+                additions = sum(
+                    1
+                    for line in diff.splitlines()
+                    if line.startswith("+") and not line.startswith("+++")
+                )
+                deletions = sum(
+                    1
+                    for line in diff.splitlines()
+                    if line.startswith("-") and not line.startswith("---")
+                )
                 record.metrics.lines_added = additions
                 record.metrics.lines_removed = deletions
             elif record.tool_name == "write_file" and (record.before_content or "") == "":
@@ -369,7 +401,7 @@ class FileOpTracker:
         return record
 
     def mark_hitl_approved(self, tool_name: str, args: dict[str, Any]) -> None:
-        """tool_name 및 file_path와 일치하는 작업을 HIL 승인됨으로 표시합니다."""
+        """Mark operations matching tool_name and file_path as HIL-approved."""
         file_path = args.get("file_path") or args.get("path")
         if not file_path:
             return
@@ -388,7 +420,11 @@ class FileOpTracker:
                 file_path = record.args.get("file_path") or record.args.get("path")
                 if file_path:
                     responses = self.backend.download_files([file_path])
-                    if responses and responses[0].content is not None and responses[0].error is None:
+                    if (
+                        responses
+                        and responses[0].content is not None
+                        and responses[0].error is None
+                    ):
                         record.after_content = responses[0].content.decode("utf-8")
                     else:
                         record.after_content = None

@@ -1,10 +1,10 @@
-"""FilesystemBackend: 파일시스템에서 직접 파일을 읽고 씁니다.
+"""FilesystemBackend: Read and write files directly from the filesystem.
 
-보안 및 검색 업그레이드:
-- virtual_mode일 때 루트 포함(root containment)을 통한 보안 경로 확인 (cwd로 샌드박싱됨)
-- 가능한 경우 O_NOFOLLOW를 사용하여 파일 I/O 시 심볼릭 링크 따라가기 방지
-- JSON 파싱을 포함한 Ripgrep 기반 검색과, 가상 경로 동작을 보존하면서
-  정규식 및 선택적 glob 포함 필터링을 지원하는 Python 폴백(fallback) 기능
+Security and search upgrades:
+- Secure path resolution with root containment when in virtual_mode (sandboxed to cwd)
+- Prevent symlink-following on file I/O using O_NOFOLLOW when available
+- Ripgrep-powered grep with JSON parsing, plus Python fallback with regex
+  and optional glob include filtering, while preserving virtual path behavior
 """
 
 import json
@@ -33,11 +33,11 @@ from deepagents.backends.utils import (
 
 
 class FilesystemBackend(BackendProtocol):
-    """파일시스템에서 직접 파일을 읽고 쓰는 백엔드.
+    """Backend that reads and writes files directly from the filesystem.
 
-    파일은 실제 파일시스템 경로를 사용하여 접근합니다. 상대 경로는
-    현재 작업 디렉토리에 상대적으로 해결(resolve)됩니다. 내용은 일반 텍스트로
-    읽고 쓰이며, 메타데이터(타임스탬프)는 파일시스템 상태(stat)에서 파생됩니다.
+    Files are accessed using their actual filesystem paths. Relative paths are
+    resolved relative to the current working directory. Content is read/written
+    as plain text, and metadata (timestamps) are derived from filesystem stats.
     """
 
     def __init__(
@@ -46,30 +46,30 @@ class FilesystemBackend(BackendProtocol):
         virtual_mode: bool = False,
         max_file_size_mb: int = 10,
     ) -> None:
-        """파일시스템 백엔드를 초기화합니다.
+        """Initialize filesystem backend.
 
         Args:
-            root_dir: 파일 작업을 위한 선택적 루트 디렉토리. 제공된 경우,
-                     모든 파일 경로는 이 디렉토리에 상대적으로 해결됩니다.
-                     제공되지 않은 경우, 현재 작업 디렉토리를 사용합니다.
+            root_dir: Optional root directory for file operations. If provided,
+                     all file paths will be resolved relative to this directory.
+                     If not provided, uses the current working directory.
         """
         self.cwd = Path(root_dir).resolve() if root_dir else Path.cwd()
         self.virtual_mode = virtual_mode
         self.max_file_size_bytes = max_file_size_mb * 1024 * 1024
 
     def _resolve_path(self, key: str) -> Path:
-        """보안 검사를 포함하여 파일 경로를 해결(resolve)합니다.
+        """Resolve a file path with security checks.
 
-        virtual_mode=True일 때, 들어오는 경로를 self.cwd 하위의 가상 절대 경로로 취급하며,
-        상위 경로 탐색(.., ~)을 허용하지 않고 해결된 경로가 루트 내에 머물도록 보장합니다.
-        virtual_mode=False일 때, 레거시 동작을 유지합니다: 절대 경로는 그대료 허용되고,
-        상대 경로는 cwd 하위로 해결됩니다.
+        When virtual_mode=True, treat incoming paths as virtual absolute paths under
+        self.cwd, disallow traversal (.., ~) and ensure resolved path stays within root.
+        When virtual_mode=False, preserve legacy behavior: absolute paths are allowed
+        as-is; relative paths resolve under cwd.
 
         Args:
-            key: 파일 경로 (절대, 상대, 또는 virtual_mode=True일 때 가상 경로)
+            key: File path (absolute, relative, or virtual when virtual_mode=True)
 
         Returns:
-            해결된 절대 Path 객체
+            Resolved absolute Path object
         """
         if self.virtual_mode:
             vpath = key if key.startswith("/") else "/" + key
@@ -88,14 +88,14 @@ class FilesystemBackend(BackendProtocol):
         return (self.cwd / path).resolve()
 
     def ls_info(self, path: str) -> list[FileInfo]:
-        """지정된 디렉토리의 파일과 디렉토리를 나열합니다 (비재귀적).
+        """List files and directories in the specified directory (non-recursive).
 
         Args:
-            path: 파일 목록을 가져올 절대 디렉토리 경로.
+            path: Absolute directory path to list files from.
 
         Returns:
-            디렉토리 바로 아래에 있는 파일 및 디렉토리에 대한 FileInfo 유사 dict 목록.
-            디렉토리는 경로 끝에 /가 붙으며 is_dir=True입니다.
+            List of FileInfo-like dicts for files and directories directly in the directory.
+            Directories have a trailing / in their path and is_dir=True.
         """
         dir_path = self._resolve_path(path)
         if not dir_path.exists() or not dir_path.is_dir():
@@ -124,23 +124,27 @@ class FilesystemBackend(BackendProtocol):
                     if is_file:
                         try:
                             st = child_path.stat()
-                            results.append({
-                                "path": abs_path,
-                                "is_dir": False,
-                                "size": int(st.st_size),
-                                "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
-                            })
+                            results.append(
+                                {
+                                    "path": abs_path,
+                                    "is_dir": False,
+                                    "size": int(st.st_size),
+                                    "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                }
+                            )
                         except OSError:
                             results.append({"path": abs_path, "is_dir": False})
                     elif is_dir:
                         try:
                             st = child_path.stat()
-                            results.append({
-                                "path": abs_path + "/",
-                                "is_dir": True,
-                                "size": 0,
-                                "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
-                            })
+                            results.append(
+                                {
+                                    "path": abs_path + "/",
+                                    "is_dir": True,
+                                    "size": 0,
+                                    "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                }
+                            )
                         except OSError:
                             results.append({"path": abs_path + "/", "is_dir": True})
                 else:
@@ -159,23 +163,27 @@ class FilesystemBackend(BackendProtocol):
                     if is_file:
                         try:
                             st = child_path.stat()
-                            results.append({
-                                "path": virt_path,
-                                "is_dir": False,
-                                "size": int(st.st_size),
-                                "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
-                            })
+                            results.append(
+                                {
+                                    "path": virt_path,
+                                    "is_dir": False,
+                                    "size": int(st.st_size),
+                                    "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                }
+                            )
                         except OSError:
                             results.append({"path": virt_path, "is_dir": False})
                     elif is_dir:
                         try:
                             st = child_path.stat()
-                            results.append({
-                                "path": virt_path + "/",
-                                "is_dir": True,
-                                "size": 0,
-                                "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
-                            })
+                            results.append(
+                                {
+                                    "path": virt_path + "/",
+                                    "is_dir": True,
+                                    "size": 0,
+                                    "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                                }
+                            )
                         except OSError:
                             results.append({"path": virt_path + "/", "is_dir": True})
         except (OSError, PermissionError):
@@ -191,15 +199,15 @@ class FilesystemBackend(BackendProtocol):
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """파일 내용을 라인 번호와 함께 읽습니다.
+        """Read file content with line numbers.
 
         Args:
-            file_path: 절대 또는 상대 파일 경로.
-            offset: 읽기 시작할 라인 오프셋 (0부터 시작).
-            limit: 읽을 최대 라인 수.
+            file_path: Absolute or relative file path.
+            offset: Line offset to start reading from (0-indexed).
+            limit: Maximum number of lines to read.
 
         Returns:
-            라인 번호가 포함된 형식화된 파일 내용, 또는 에러 메시지.
+            Formatted file content with line numbers, or error message.
         """
         resolved_path = self._resolve_path(file_path)
 
@@ -233,15 +241,13 @@ class FilesystemBackend(BackendProtocol):
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """내용을 포함하는 새 파일을 생성합니다.
-        WriteResult를 반환합니다. 외부 저장소는 files_update=None을 설정합니다.
+        """Create a new file with content.
+        Returns WriteResult. External storage sets files_update=None.
         """
         resolved_path = self._resolve_path(file_path)
 
         if resolved_path.exists():
-            return WriteResult(
-                error=f"Cannot write to {file_path} because it already exists. Read and then make an edit, or write to a new path."
-            )
+            return WriteResult(error=f"Cannot write to {file_path} because it already exists. Read and then make an edit, or write to a new path.")
 
         try:
             # Create parent directories if needed
@@ -266,8 +272,8 @@ class FilesystemBackend(BackendProtocol):
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """문자열 발생(occurrences)을 교체하여 파일을 편집합니다.
-        EditResult를 반환합니다. 외부 저장소는 files_update=None을 설정합니다.
+        """Edit a file by replacing string occurrences.
+        Returns EditResult. External storage sets files_update=None.
         """
         resolved_path = self._resolve_path(file_path)
 
@@ -331,9 +337,7 @@ class FilesystemBackend(BackendProtocol):
                 matches.append({"path": fpath, "line": int(line_num), "text": line_text})
         return matches
 
-    def _ripgrep_search(
-        self, pattern: str, base_full: Path, include_glob: str | None
-    ) -> dict[str, list[tuple[int, str]]] | None:
+    def _ripgrep_search(self, pattern: str, base_full: Path, include_glob: str | None) -> dict[str, list[tuple[int, str]]] | None:
         cmd = ["rg", "--json"]
         if include_glob:
             cmd.extend(["--glob", include_glob])
@@ -378,9 +382,7 @@ class FilesystemBackend(BackendProtocol):
 
         return results
 
-    def _python_search(
-        self, pattern: str, base_full: Path, include_glob: str | None
-    ) -> dict[str, list[tuple[int, str]]]:
+    def _python_search(self, pattern: str, base_full: Path, include_glob: str | None) -> dict[str, list[tuple[int, str]]]:
         try:
             regex = re.compile(pattern)
         except re.error:
@@ -438,12 +440,14 @@ class FilesystemBackend(BackendProtocol):
                 if not self.virtual_mode:
                     try:
                         st = matched_path.stat()
-                        results.append({
-                            "path": abs_path,
-                            "is_dir": False,
-                            "size": int(st.st_size),
-                            "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
-                        })
+                        results.append(
+                            {
+                                "path": abs_path,
+                                "is_dir": False,
+                                "size": int(st.st_size),
+                                "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                            }
+                        )
                     except OSError:
                         results.append({"path": abs_path, "is_dir": False})
                 else:
@@ -459,12 +463,14 @@ class FilesystemBackend(BackendProtocol):
                     virt = "/" + relative_path
                     try:
                         st = matched_path.stat()
-                        results.append({
-                            "path": virt,
-                            "is_dir": False,
-                            "size": int(st.st_size),
-                            "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
-                        })
+                        results.append(
+                            {
+                                "path": virt,
+                                "is_dir": False,
+                                "size": int(st.st_size),
+                                "modified_at": datetime.fromtimestamp(st.st_mtime).isoformat(),
+                            }
+                        )
                     except OSError:
                         results.append({"path": virt, "is_dir": False})
         except (OSError, ValueError):
@@ -474,14 +480,14 @@ class FilesystemBackend(BackendProtocol):
         return results
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """파일시스템에 여러 파일을 업로드합니다.
+        """Upload multiple files to the filesystem.
 
         Args:
-            files: 내용이 bytes인 (path, content) 튜플의 리스트.
+            files: List of (path, content) tuples where content is bytes.
 
         Returns:
-            FileUploadResponse 객체들의 리스트. 입력 파일마다 하나씩 반환됩니다.
-            응답 순서는 입력 순서와 일치합니다.
+            List of FileUploadResponse objects, one per input file.
+            Response order matches input order.
         """
         responses: list[FileUploadResponse] = []
         for path, content in files:
@@ -514,13 +520,13 @@ class FilesystemBackend(BackendProtocol):
         return responses
 
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """파일시스템에서 여러 파일을 다운로드합니다.
+        """Download multiple files from the filesystem.
 
         Args:
-            paths: 다운로드할 파일 경로의 리스트.
+            paths: List of file paths to download.
 
         Returns:
-            FileDownloadResponse 객체들의 리스트. 입력 경로마다 하나씩 반환됩니다.
+            List of FileDownloadResponse objects, one per input path.
         """
         responses: list[FileDownloadResponse] = []
         for path in paths:

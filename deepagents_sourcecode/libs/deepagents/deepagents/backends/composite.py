@@ -1,4 +1,22 @@
-"""CompositeBackend: 경로 접두사(prefix)를 기반으로 작업을 다른 백엔드로 라우팅합니다."""
+"""Composite backend that routes file operations by path prefix.
+
+Routes operations to different backends based on path prefixes. Use this when you
+need different storage strategies for different paths (e.g., state for temp files,
+persistent store for memories).
+
+Examples:
+    ```python
+    from deepagents.backends.composite import CompositeBackend
+    from deepagents.backends.state import StateBackend
+    from deepagents.backends.store import StoreBackend
+
+    runtime = make_runtime()
+    composite = CompositeBackend(default=StateBackend(runtime), routes={"/memories/": StoreBackend(runtime)})
+
+    composite.write("/temp.txt", "ephemeral")
+    composite.write("/memories/note.md", "persistent")
+    ```
+"""
 
 from collections import defaultdict
 
@@ -16,12 +34,38 @@ from deepagents.backends.protocol import (
 from deepagents.backends.state import StateBackend
 
 
-class CompositeBackend:
+class CompositeBackend(BackendProtocol):
+    """Routes file operations to different backends by path prefix.
+
+    Matches paths against route prefixes (longest first) and delegates to the
+    corresponding backend. Unmatched paths use the default backend.
+
+    Attributes:
+        default: Backend for paths that don't match any route.
+        routes: Map of path prefixes to backends (e.g., {"/memories/": store_backend}).
+        sorted_routes: Routes sorted by length (longest first) for correct matching.
+
+    Examples:
+        ```python
+        composite = CompositeBackend(default=StateBackend(runtime), routes={"/memories/": StoreBackend(runtime), "/cache/": StoreBackend(runtime)})
+
+        composite.write("/temp.txt", "data")
+        composite.write("/memories/note.txt", "data")
+        ```
+    """
+
     def __init__(
         self,
         default: BackendProtocol | StateBackend,
         routes: dict[str, BackendProtocol],
     ) -> None:
+        """Initialize composite backend.
+
+        Args:
+            default: Backend for paths that don't match any route.
+            routes: Map of path prefixes to backends. Prefixes must start with "/"
+                and should end with "/" (e.g., "/memories/").
+        """
         # Default backend
         self.default = default
 
@@ -32,14 +76,14 @@ class CompositeBackend:
         self.sorted_routes = sorted(routes.items(), key=lambda x: len(x[0]), reverse=True)
 
     def _get_backend_and_key(self, key: str) -> tuple[BackendProtocol, str]:
-        """어떤 백엔드가 이 키를 처리하는지 결정하고 접두사를 제거합니다.
+        """Get backend for path and strip route prefix.
 
         Args:
-            key: 원본 파일 경로
+            key: File path to route.
 
         Returns:
-            (backend, stripped_key) 튜플. stripped_key는 라우트 접두사가
-            제거된 상태입니다 (하지만 선행 슬래시는 유지됨).
+            Tuple of (backend, stripped_path). The stripped path has the route
+            prefix removed but keeps the leading slash.
         """
         # Check routes in order of length (longest first)
         for prefix, backend in self.sorted_routes:
@@ -53,14 +97,23 @@ class CompositeBackend:
         return self.default, key
 
     def ls_info(self, path: str) -> list[FileInfo]:
-        """지정된 디렉토리의 파일과 디렉토리를 나열합니다 (비재귀적).
+        """List directory contents (non-recursive).
+
+        If path matches a route, lists only that backend. If path is "/", aggregates
+        default backend plus virtual route directories. Otherwise lists default backend.
 
         Args:
-            path: 디렉토리의 절대 경로.
+            path: Absolute directory path starting with "/".
 
         Returns:
-            디렉토리 바로 아래에 있는 파일 및 디렉토리에 대한 FileInfo 유사 dict 목록 (라우트 접두사 추가됨).
-            디렉토리는 경로 끝에 /가 붙으며 is_dir=True입니다.
+            List of FileInfo dicts. Directories have trailing "/" and is_dir=True.
+            Route prefixes are restored in returned paths.
+
+        Examples:
+            ```python
+            infos = composite.ls_info("/")
+            infos = composite.ls_info("/memories/")
+            ```
         """
         # Check if path matches a specific route
         for route_prefix, backend in self.sorted_routes:
@@ -82,12 +135,14 @@ class CompositeBackend:
             results.extend(self.default.ls_info(path))
             for route_prefix, backend in self.sorted_routes:
                 # Add the route itself as a directory (e.g., /memories/)
-                results.append({
-                    "path": route_prefix,
-                    "is_dir": True,
-                    "size": 0,
-                    "modified_at": "",
-                })
+                results.append(
+                    {
+                        "path": route_prefix,
+                        "is_dir": True,
+                        "size": 0,
+                        "modified_at": "",
+                    }
+                )
 
             results.sort(key=lambda x: x.get("path", ""))
             return results
@@ -96,7 +151,7 @@ class CompositeBackend:
         return self.default.ls_info(path)
 
     async def als_info(self, path: str) -> list[FileInfo]:
-        """ls_info의 비동기 버전입니다."""
+        """Async version of ls_info."""
         # Check if path matches a specific route
         for route_prefix, backend in self.sorted_routes:
             if path.startswith(route_prefix.rstrip("/")):
@@ -117,12 +172,14 @@ class CompositeBackend:
             results.extend(await self.default.als_info(path))
             for route_prefix, backend in self.sorted_routes:
                 # Add the route itself as a directory (e.g., /memories/)
-                results.append({
-                    "path": route_prefix,
-                    "is_dir": True,
-                    "size": 0,
-                    "modified_at": "",
-                })
+                results.append(
+                    {
+                        "path": route_prefix,
+                        "is_dir": True,
+                        "size": 0,
+                        "modified_at": "",
+                    }
+                )
 
             results.sort(key=lambda x: x.get("path", ""))
             return results
@@ -136,15 +193,15 @@ class CompositeBackend:
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """적절한 백엔드로 라우팅하여 파일 내용을 읽습니다.
+        """Read file content, routing to appropriate backend.
 
         Args:
-            file_path: 파일 절대 경로.
-            offset: 읽기 시작할 라인 오프셋 (0부터 시작).
-            limit: 읽을 최대 라인 수.
+            file_path: Absolute file path.
+            offset: Line offset to start reading from (0-indexed).
+            limit: Maximum number of lines to read.
 
         Returns:
-            라인 번호가 포함된 형식화된 파일 내용, 또는 에러 메시지.
+            Formatted file content with line numbers, or error message.
         """
         backend, stripped_key = self._get_backend_and_key(file_path)
         return backend.read(stripped_key, offset=offset, limit=limit)
@@ -155,7 +212,7 @@ class CompositeBackend:
         offset: int = 0,
         limit: int = 2000,
     ) -> str:
-        """read의 비동기 버전입니다."""
+        """Async version of read."""
         backend, stripped_key = self._get_backend_and_key(file_path)
         return await backend.aread(stripped_key, offset=offset, limit=limit)
 
@@ -165,6 +222,28 @@ class CompositeBackend:
         path: str | None = None,
         glob: str | None = None,
     ) -> list[GrepMatch] | str:
+        """Search files for regex pattern.
+
+        Routes to backends based on path: specific route searches one backend,
+        "/" or None searches all backends, otherwise searches default backend.
+
+        Args:
+            pattern: Regex pattern to search for.
+            path: Directory to search. None searches all backends.
+            glob: Glob pattern to filter files (e.g., "*.py", "**/*.txt").
+                Filters by filename, not content.
+
+        Returns:
+            List of GrepMatch dicts with path (route prefix restored), line
+            (1-indexed), and text. Returns error string on failure.
+
+        Examples:
+            ```python
+            matches = composite.grep_raw("TODO", path="/memories/")
+            matches = composite.grep_raw("error", path="/")
+            matches = composite.grep_raw("import", path="/", glob="*.py")
+            ```
+        """
         # If path targets a specific route, search only that backend
         for route_prefix, backend in self.sorted_routes:
             if path is not None and path.startswith(route_prefix.rstrip("/")):
@@ -174,22 +253,26 @@ class CompositeBackend:
                     return raw
                 return [{**m, "path": f"{route_prefix[:-1]}{m['path']}"} for m in raw]
 
-        # Otherwise, search default and all routed backends and merge
-        all_matches: list[GrepMatch] = []
-        raw_default = self.default.grep_raw(pattern, path, glob)  # type: ignore[attr-defined]
-        if isinstance(raw_default, str):
-            # This happens if error occurs
-            return raw_default
-        all_matches.extend(raw_default)
-
-        for route_prefix, backend in self.routes.items():
-            raw = backend.grep_raw(pattern, "/", glob)
-            if isinstance(raw, str):
+        # If path is None or "/", search default and all routed backends and merge
+        # Otherwise, search only the default backend
+        if path is None or path == "/":
+            all_matches: list[GrepMatch] = []
+            raw_default = self.default.grep_raw(pattern, path, glob)  # type: ignore[attr-defined]
+            if isinstance(raw_default, str):
                 # This happens if error occurs
-                return raw
-            all_matches.extend({**m, "path": f"{route_prefix[:-1]}{m['path']}"} for m in raw)
+                return raw_default
+            all_matches.extend(raw_default)
 
-        return all_matches
+            for route_prefix, backend in self.routes.items():
+                raw = backend.grep_raw(pattern, "/", glob)
+                if isinstance(raw, str):
+                    # This happens if error occurs
+                    return raw
+                all_matches.extend({**m, "path": f"{route_prefix[:-1]}{m['path']}"} for m in raw)
+
+            return all_matches
+        # Path specified but doesn't match a route - search only default
+        return self.default.grep_raw(pattern, path, glob)  # type: ignore[attr-defined]
 
     async def agrep_raw(
         self,
@@ -197,7 +280,10 @@ class CompositeBackend:
         path: str | None = None,
         glob: str | None = None,
     ) -> list[GrepMatch] | str:
-        """grep_raw의 비동기 버전입니다."""
+        """Async version of grep_raw.
+
+        See grep_raw() for detailed documentation on routing behavior and parameters.
+        """
         # If path targets a specific route, search only that backend
         for route_prefix, backend in self.sorted_routes:
             if path is not None and path.startswith(route_prefix.rstrip("/")):
@@ -207,22 +293,26 @@ class CompositeBackend:
                     return raw
                 return [{**m, "path": f"{route_prefix[:-1]}{m['path']}"} for m in raw]
 
-        # Otherwise, search default and all routed backends and merge
-        all_matches: list[GrepMatch] = []
-        raw_default = await self.default.agrep_raw(pattern, path, glob)  # type: ignore[attr-defined]
-        if isinstance(raw_default, str):
-            # This happens if error occurs
-            return raw_default
-        all_matches.extend(raw_default)
-
-        for route_prefix, backend in self.routes.items():
-            raw = await backend.agrep_raw(pattern, "/", glob)
-            if isinstance(raw, str):
+        # If path is None or "/", search default and all routed backends and merge
+        # Otherwise, search only the default backend
+        if path is None or path == "/":
+            all_matches: list[GrepMatch] = []
+            raw_default = await self.default.agrep_raw(pattern, path, glob)  # type: ignore[attr-defined]
+            if isinstance(raw_default, str):
                 # This happens if error occurs
-                return raw
-            all_matches.extend({**m, "path": f"{route_prefix[:-1]}{m['path']}"} for m in raw)
+                return raw_default
+            all_matches.extend(raw_default)
 
-        return all_matches
+            for route_prefix, backend in self.routes.items():
+                raw = await backend.agrep_raw(pattern, "/", glob)
+                if isinstance(raw, str):
+                    # This happens if error occurs
+                    return raw
+                all_matches.extend({**m, "path": f"{route_prefix[:-1]}{m['path']}"} for m in raw)
+
+            return all_matches
+        # Path specified but doesn't match a route - search only default
+        return await self.default.agrep_raw(pattern, path, glob)  # type: ignore[attr-defined]
 
     def glob_info(self, pattern: str, path: str = "/") -> list[FileInfo]:
         results: list[FileInfo] = []
@@ -246,7 +336,7 @@ class CompositeBackend:
         return results
 
     async def aglob_info(self, pattern: str, path: str = "/") -> list[FileInfo]:
-        """glob_info의 비동기 버전입니다."""
+        """Async version of glob_info."""
         results: list[FileInfo] = []
 
         # Route based on path, not pattern
@@ -272,14 +362,14 @@ class CompositeBackend:
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """적절한 백엔드로 라우팅하여 새 파일을 생성합니다.
+        """Create a new file, routing to appropriate backend.
 
         Args:
-            file_path: 파일 절대 경로.
-            content: 문자열 형태의 파일 내용.
+            file_path: Absolute file path.
+            content: File content as a string.
 
         Returns:
-            성공 메시지 또는 Command 객체, 또는 파일이 이미 존재하는 경우 에러.
+            Success message or Command object, or error if file already exists.
         """
         backend, stripped_key = self._get_backend_and_key(file_path)
         res = backend.write(stripped_key, content)
@@ -301,7 +391,7 @@ class CompositeBackend:
         file_path: str,
         content: str,
     ) -> WriteResult:
-        """write의 비동기 버전입니다."""
+        """Async version of write."""
         backend, stripped_key = self._get_backend_and_key(file_path)
         res = await backend.awrite(stripped_key, content)
         # If this is a state-backed update and default has state, merge so listings reflect changes
@@ -324,16 +414,16 @@ class CompositeBackend:
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """적절한 백엔드로 라우팅하여 파일을 편집합니다.
+        """Edit a file, routing to appropriate backend.
 
         Args:
-            file_path: 파일 절대 경로.
-            old_string: 찾아서 교체할 문자열.
-            new_string: 교체할 문자열.
-            replace_all: True인 경우 모든 발생을 교체.
+            file_path: Absolute file path.
+            old_string: String to find and replace.
+            new_string: Replacement string.
+            replace_all: If True, replace all occurrences.
 
         Returns:
-            성공 메시지 또는 Command 객체, 또는 실패 시 에러 메시지.
+            Success message or Command object, or error message on failure.
         """
         backend, stripped_key = self._get_backend_and_key(file_path)
         res = backend.edit(stripped_key, old_string, new_string, replace_all=replace_all)
@@ -356,7 +446,7 @@ class CompositeBackend:
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        """edit의 비동기 버전입니다."""
+        """Async version of edit."""
         backend, stripped_key = self._get_backend_and_key(file_path)
         res = await backend.aedit(stripped_key, old_string, new_string, replace_all=replace_all)
         if res.files_update:
@@ -375,19 +465,23 @@ class CompositeBackend:
         self,
         command: str,
     ) -> ExecuteResponse:
-        """기본(default) 백엔드를 통해 명령을 실행합니다.
-
-        실행은 경로에 특정되지 않으므로, 항상 기본 백엔드로 위임됩니다.
-        이 기능이 작동하려면 기본 백엔드가 SandboxBackendProtocol을 구현해야 합니다.
+        """Execute shell command via default backend.
 
         Args:
-            command: 실행할 전체 쉘 명령 문자열.
+            command: Shell command to execute.
 
         Returns:
-            결합된 출력, 종료 코드, 잘림(truncation) 플래그를 포함하는 ExecuteResponse.
+            ExecuteResponse with output, exit code, and truncation flag.
 
         Raises:
-            NotImplementedError: 기본 백엔드가 실행을 지원하지 않는 경우.
+            NotImplementedError: If default backend doesn't implement SandboxBackendProtocol.
+
+        Examples:
+            ```python
+            composite = CompositeBackend(default=FilesystemBackend(root_dir="/tmp"), routes={"/memories/": StoreBackend(runtime)})
+
+            result = composite.execute("ls -la")
+            ```
         """
         if isinstance(self.default, SandboxBackendProtocol):
             return self.default.execute(command)
@@ -403,7 +497,7 @@ class CompositeBackend:
         self,
         command: str,
     ) -> ExecuteResponse:
-        """execute의 비동기 버전입니다."""
+        """Async version of execute."""
         if isinstance(self.default, SandboxBackendProtocol):
             return await self.default.aexecute(command)
 
@@ -415,17 +509,17 @@ class CompositeBackend:
         )
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """효율성을 위해 백엔드별로 배치 처리하여 여러 파일을 업로드합니다.
+        """Upload multiple files, batching by backend for efficiency.
 
-        파일을 대상 백엔드별로 그룹화하고, 각 백엔드의 upload_files를
-        해당 백엔드의 모든 파일과 함께 한 번 호출한 다음, 결과를 원래 순서대로 병합합니다.
+        Groups files by their target backend, calls each backend's upload_files
+        once with all files for that backend, then merges results in original order.
 
         Args:
-            files: 업로드할 (path, content) 튜플의 리스트.
+            files: List of (path, content) tuples to upload.
 
         Returns:
-            FileUploadResponse 객체들의 리스트. 입력 파일마다 하나씩 반환됩니다.
-            응답 순서는 입력 순서와 일치합니다.
+            List of FileUploadResponse objects, one per input file.
+            Response order matches input order.
         """
         # Pre-allocate result list
         results: list[FileUploadResponse | None] = [None] * len(files)
@@ -458,7 +552,7 @@ class CompositeBackend:
         return results  # type: ignore[return-value]
 
     async def aupload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
-        """upload_files의 비동기 버전입니다."""
+        """Async version of upload_files."""
         # Pre-allocate result list
         results: list[FileUploadResponse | None] = [None] * len(files)
 
@@ -488,17 +582,17 @@ class CompositeBackend:
         return results  # type: ignore[return-value]
 
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """효율성을 위해 백엔드별로 배치 처리하여 여러 파일을 다운로드합니다.
+        """Download multiple files, batching by backend for efficiency.
 
-        경로를 대상 백엔드별로 그룹화하고, 각 백엔드의 download_files를
-        해당 백엔드의 모든 경로와 함께 한 번 호출한 다음, 결과를 원래 순서대로 병합합니다.
+        Groups paths by their target backend, calls each backend's download_files
+        once with all paths for that backend, then merges results in original order.
 
         Args:
-            paths: 다운로드할 파일 경로의 리스트.
+            paths: List of file paths to download.
 
         Returns:
-            FileDownloadResponse 객체들의 리스트. 입력 경로마다 하나씩 반환됩니다.
-            응답 순서는 입력 순서와 일치합니다.
+            List of FileDownloadResponse objects, one per input path.
+            Response order matches input order.
         """
         # Pre-allocate result list
         results: list[FileDownloadResponse | None] = [None] * len(paths)
@@ -528,7 +622,7 @@ class CompositeBackend:
         return results  # type: ignore[return-value]
 
     async def adownload_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """download_files의 비동기 버전입니다."""
+        """Async version of download_files."""
         # Pre-allocate result list
         results: list[FileDownloadResponse | None] = [None] * len(paths)
 

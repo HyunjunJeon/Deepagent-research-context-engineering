@@ -1,10 +1,10 @@
-"""CLI 에이전트를 위한 사용자 정의 도구."""
+"""Custom tools for the CLI agent."""
 
 from typing import Any, Literal
 
-import requests  # type: ignore
-from markdownify import markdownify  # type: ignore
-from tavily import TavilyClient  # type: ignore
+import requests
+from markdownify import markdownify
+from tavily import TavilyClient
 
 from deepagents_cli.config import settings
 
@@ -20,10 +20,10 @@ def http_request(
     params: dict[str, str] | None = None,
     timeout: int = 30,
 ) -> dict[str, Any]:
-    """Sends an HTTP request to an API or web service.
+    """Make HTTP requests to APIs and web services.
 
     Args:
-        url: The URL to target
+        url: Target URL
         method: HTTP method (GET, POST, PUT, DELETE, etc.)
         headers: HTTP headers to include
         data: Request body data (string or dict)
@@ -31,7 +31,7 @@ def http_request(
         timeout: Request timeout in seconds
 
     Returns:
-        Dictionary containing status_code, headers, and content
+        Dictionary with response data including status, headers, and content
     """
     try:
         kwargs = {"url": url, "method": method.upper(), "timeout": timeout}
@@ -66,7 +66,7 @@ def http_request(
             "success": False,
             "status_code": 0,
             "headers": {},
-            "content": f"{timeout}초 후 요청 시간이 초과되었습니다",
+            "content": f"Request timed out after {timeout} seconds",
             "url": url,
         }
     except requests.exceptions.RequestException as e:
@@ -74,7 +74,7 @@ def http_request(
             "success": False,
             "status_code": 0,
             "headers": {},
-            "content": f"요청 오류: {e!s}",
+            "content": f"Request error: {e!s}",
             "url": url,
         }
     except Exception as e:
@@ -82,7 +82,7 @@ def http_request(
             "success": False,
             "status_code": 0,
             "headers": {},
-            "content": f"요청 생성 오류: {e!s}",
+            "content": f"Error making request: {e!s}",
             "url": url,
         }
 
@@ -93,36 +93,36 @@ def web_search(
     topic: Literal["general", "news", "finance"] = "general",
     include_raw_content: bool = False,
 ):
-    """Performs a web search using Tavily for current information and documents.
+    """Search the web using Tavily for current information and documentation.
 
     This tool searches the web and returns relevant results. After receiving results,
-    you should synthesize the information into a natural response that helps the user.
+    you MUST synthesize the information into a natural, helpful response for the user.
 
     Args:
-        query: The search query (specific and detailed)
+        query: The search query (be specific and detailed)
         max_results: Number of results to return (default: 5)
-        topic: The topic type of the search - "general" for most queries, "news" for current events
-        include_raw_content: Include full page content (Warning: uses more tokens)
+        topic: Search topic type - "general" for most queries, "news" for current events
+        include_raw_content: Include full page content (warning: uses more tokens)
 
     Returns:
         Dictionary containing:
-        - results: List of search results, each containing:
+        - results: List of search results, each with:
             - title: Page title
             - url: Page URL
-            - content: Relevant snippet from the page
+            - content: Relevant excerpt from the page
             - score: Relevance score (0-1)
-        - query: Original search query
+        - query: The original search query
 
     IMPORTANT: After using this tool:
-    1. Read the 'content' field of each result
+    1. Read through the 'content' field of each result
     2. Extract relevant information that answers the user's question
     3. Synthesize this into a clear, natural language response
-    4. Cite sources by mentioning the page title or URL
-    5. Do NOT show raw JSON to the user - always provide a formatted response
+    4. Cite sources by mentioning the page titles or URLs
+    5. NEVER show the raw JSON to the user - always provide a formatted response
     """
     if tavily_client is None:
         return {
-            "error": "Tavily API 키가 구성되지 않았습니다. TAVILY_API_KEY 환경 변수를 설정하십시오.",
+            "error": "Tavily API key not configured. Please set TAVILY_API_KEY environment variable.",
             "query": query,
         }
 
@@ -134,15 +134,15 @@ def web_search(
             topic=topic,
         )
     except Exception as e:
-        return {"error": f"웹 검색 오류: {e!s}", "query": query}
+        return {"error": f"Web search error: {e!s}", "query": query}
 
 
 def fetch_url(url: str, timeout: int = 30) -> dict[str, Any]:
-    """Fetches content from a URL and converts HTML to markdown format.
+    """Fetch content from a URL and convert HTML to markdown format.
 
     This tool fetches web page content and converts it to clean markdown text,
-    making it easier to read and process HTML content. After receiving markdown,
-    you should synthesize the information into a natural response that helps the user.
+    making it easy to read and process HTML content. After receiving the markdown,
+    you MUST synthesize the information into a natural, helpful response for the user.
 
     Args:
         url: The URL to fetch (must be a valid HTTP/HTTPS URL)
@@ -150,17 +150,17 @@ def fetch_url(url: str, timeout: int = 30) -> dict[str, Any]:
 
     Returns:
         Dictionary containing:
-        - success: Whether the request was successful
-        - url: Final URL after redirects
+        - success: Whether the request succeeded
+        - url: The final URL after redirects
         - markdown_content: The page content converted to markdown
         - status_code: HTTP status code
-        - content_length: Length of markdown content (in characters)
+        - content_length: Length of the markdown content in characters
 
     IMPORTANT: After using this tool:
-    1. Read the markdown_content
+    1. Read through the markdown content
     2. Extract relevant information that answers the user's question
     3. Synthesize this into a clear, natural language response
-    4. Do NOT show raw markdown to the user unless specifically requested
+    4. NEVER show the raw markdown to the user unless specifically requested
     """
     try:
         response = requests.get(
@@ -180,4 +180,4 @@ def fetch_url(url: str, timeout: int = 30) -> dict[str, Any]:
             "content_length": len(markdown_content),
         }
     except Exception as e:
-        return {"error": f"URL 가져오기 오류: {e!s}", "url": url}
+        return {"error": f"Fetch URL error: {e!s}", "url": url}
