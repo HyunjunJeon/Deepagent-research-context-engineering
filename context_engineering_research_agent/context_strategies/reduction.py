@@ -42,7 +42,6 @@ from typing import cast
 
 from langchain.agents.middleware.types import (
     AgentMiddleware,
-    AnyMessage,
     ModelRequest,
     ModelResponse,
 )
@@ -53,6 +52,7 @@ from langchain_core.messages import (
     HumanMessage,
     SystemMessage,
 )
+from langchain_core.messages.utils import AnyMessage
 
 
 @dataclass
